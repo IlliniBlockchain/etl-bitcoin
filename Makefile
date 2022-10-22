@@ -3,9 +3,18 @@ PKG := "github.com/IlliniBlockchain/$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/ | grep -v mocks)
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
-.PHONY: all dep build clean test coverage coverhtml lint
+.PHONY: all dep build clean test coverage coverhtml lint docker.start docker.stop docker.restart test.unit test.integration test.integration.rpcclient
 
 all: build
+
+docker.start: ## Start docker containers
+	@docker-compose up -d
+
+docker.start.bitcoin-core: ## Start bitcoin-core docker container
+	@docker-compose up -d bitcoin-core
+
+docker.stop: ## Stop docker containers
+	@docker-compose down
 
 lint: ## Lint the files
 	@golangci-lint run
@@ -13,8 +22,16 @@ lint: ## Lint the files
 report: ## Run goreportcard
 	@goreportcard-cli -v
 
-test: ## Run unittests
+test: test.unit test.integration ## Run all tests
+
+test.unit: ## Run unit tests
 	@go test -timeout 120s -short ${PKG_LIST}
+
+test.integration: test.integration.rpcclient ## Run integration tests
+
+test.integration.rpcclient: docker.stop docker.start.bitcoin-core ## Run rpcclient integration tests
+	@go test -run Integration -run RPCClient ${PKG_LIST}
+	@docker-compose down
 
 race: dep ## Run data race detector
 	@go test -race -short ${PKG_LIST}
