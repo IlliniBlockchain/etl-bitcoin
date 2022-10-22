@@ -8,13 +8,31 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 all: build
 
 docker.start: ## Start docker containers
-	@docker-compose up -d
+	@docker run --rm -d \
+		-p 18443:18443 \
+		-p 18444:18444 \
+		ruimarinho/bitcoin-core \
+		-printtoconsole \
+		-regtest=1 \
+		-rpcallowip=172.17.0.0/16 \
+		-rpcbind=0.0.0.0 \
+		-rpcuser=test \
+		-rpcpassword=test
 
 docker.start.bitcoin-core: ## Start bitcoin-core docker container
-	@docker-compose up -d bitcoin-core
+	docker run --rm -it \
+		-p 18443:18443 \
+		-p 18444:18444 \
+		ruimarinho/bitcoin-core \
+		-printtoconsole \
+		-regtest=1 \
+		-rpcallowip=172.17.0.0/16 \
+		-rpcbind=0.0.0.0 \
+		-rpcuser=test \
+		-rpcpassword=test
 
 docker.stop: ## Stop docker containers
-	@docker-compose down
+	@docker stop $$(docker ps -q)
 
 lint: ## Lint the files
 	@golangci-lint run
