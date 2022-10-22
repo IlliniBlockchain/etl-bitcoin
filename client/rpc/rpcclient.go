@@ -12,7 +12,7 @@ type RPCClient struct {
 }
 
 func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandlers) (*RPCClient, error) {
-	internal_client, err := rpcclient.New(config, nil)
+	internal_client, err := rpcclient.NewBatch(config)
 	if err != nil {
 		return nil, err
 	}
@@ -22,6 +22,7 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 	return &client, nil
 }
 
+// GetBlocksByRange returns raw blocks from the server given a range of block numbers.
 func (client *RPCClient) GetBlocksByRange(minBlockNumber, maxBlockNumber int64) ([]*wire.MsgBlock, error) {
 	return nil, nil
 }
