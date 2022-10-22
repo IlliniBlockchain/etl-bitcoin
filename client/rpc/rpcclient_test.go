@@ -55,7 +55,7 @@ func (suite *RPCClientTestSuite) SetupSuite() {
 	hashes, err := generateReq.Receive()
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), nBlocks, len(hashes))
-	suite.BlockCount = 20
+	suite.BlockCount = nBlocks
 
 }
 
@@ -67,6 +67,16 @@ func (suite *RPCClientTestSuite) TestSanityBlockCount() {
 	blockCount, err := blockCountReq.Receive()
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), suite.BlockCount, blockCount)
+}
+
+func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
+
+	client := suite.Client
+	var nBlocks int64 = 10
+	blocks, err := client.GetBlocksByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
+	assert.NoError(suite.T(), err)
+	assert.EqualValues(suite.T(), nBlocks, len(blocks))
+	// How to test values?
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
