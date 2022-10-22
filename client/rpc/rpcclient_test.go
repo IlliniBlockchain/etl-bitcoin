@@ -1,7 +1,6 @@
 package rpcclient
 
 import (
-	"fmt"
 	"testing"
 
 	"github.com/btcsuite/btcd/rpcclient"
@@ -35,7 +34,6 @@ func TestNewRPCClient(t *testing.T) {
 func TestRPCClientPing(t *testing.T) {
 	client, err := GetTestRPCClient()
 	assert.NoError(t, err)
-	block_count, err := client.GetBlockCount()
+	_, err = client.GetBlockCount()
 	assert.NoError(t, err)
-	fmt.Println(block_count)
 }
