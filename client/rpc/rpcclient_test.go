@@ -98,6 +98,26 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 	// How to test values?
 }
 
+func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
+
+	client := suite.Client
+	var nBlocks int64 = 10
+	blocks, err := client.GetBlocksVerboseByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
+	assert.NoError(suite.T(), err)
+	assert.EqualValues(suite.T(), nBlocks, len(blocks))
+	// How to test values?
+}
+
+func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
+
+	client := suite.Client
+	var nBlocks int64 = 10
+	blocks, err := client.GetBlocksVerboseTxByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
+	assert.NoError(suite.T(), err)
+	assert.EqualValues(suite.T(), nBlocks, len(blocks))
+	// How to test values?
+}
+
 func TestRPCClientTestSuite(t *testing.T) {
 	suite.Run(t, new(RPCClientTestSuite))
 }
