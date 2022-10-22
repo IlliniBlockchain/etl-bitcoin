@@ -1,0 +1,12 @@
+version: "3.9"
+services:
+  bitcoin-core:
+    image: ruimarinho/bitcoin-core
+    ports:
+      - "8332:8332"
+      - "8333:8333"
+    command:
+      -printtoconsole
+      -regtest=1
+      -rpcuser=test
+      -rpcpassword=test
