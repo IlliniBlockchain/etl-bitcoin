@@ -23,11 +23,11 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 	return &client, nil
 }
 
-// GetBlocksByRange returns raw blocks from the server given a range (inclusive) of block numbers.
-func (client *RPCClient) GetBlocksByRange(minBlockNumber, maxBlockNumber int64) (blocks []*wire.MsgBlock, err error) {
+// Helper function to batch translating block numbers to hashes
+func (client *RPCClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) (hashes []*chainhash.Hash, err error) {
+	// Blocks are returned in order from minBlockNumber to maxBlockNumber
 	nBlocks := maxBlockNumber - minBlockNumber + 1
 
-	// Block hashes
 	// Queue block hash requests
 	hashReqs := make([]rpcclient.FutureGetBlockHashResult, nBlocks)
 	for i := range hashReqs {
@@ -44,34 +44,103 @@ func (client *RPCClient) GetBlocksByRange(minBlockNumber, maxBlockNumber int64) 
 		}
 	}
 
-	// Blocks
+	return blockHashes, nil
+}
+
+func (client *RPCClient) GetBlocksByHashes(hashes []*chainhash.Hash) (blocks []*wire.MsgBlock, err error) {
 	// Queue block requests
-	blockReqs := make([]rpcclient.FutureGetBlockResult, nBlocks)
-	for i, blockHash := range blockHashes {
+	blockReqs := make([]rpcclient.FutureGetBlockResult, len(hashes))
+	for i, blockHash := range hashes {
 		blockReqs[i] = client.GetBlockAsync(blockHash)
 	}
 	// Send
 	client.Send()
 	// Receive block requests
-	blocks = make([]*wire.MsgBlock, nBlocks)
+	blocks = make([]*wire.MsgBlock, len(hashes))
 	for i, req := range blockReqs {
 		blocks[i], err = req.Receive()
 		if err != nil {
 			return nil, err
 		}
 	}
+	return blocks, nil
+}
 
+func (client *RPCClient) GetBlocksVerboseByHashes(hashes []*chainhash.Hash) (blocks []*btcjson.GetBlockVerboseResult, err error) {
+	// Queue block requests
+	blockReqs := make([]rpcclient.FutureGetBlockVerboseResult, len(hashes))
+	for i, blockHash := range hashes {
+		blockReqs[i] = client.GetBlockVerboseAsync(blockHash)
+	}
+	// Send
+	client.Send()
+	// Receive block requests
+	blocks = make([]*btcjson.GetBlockVerboseResult, len(hashes))
+	for i, req := range blockReqs {
+		blocks[i], err = req.Receive()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return blocks, nil
+}
+
+func (client *RPCClient) GetBlocksVerboseTxByHashes(hashes []*chainhash.Hash) (blocks []*btcjson.GetBlockVerboseTxResult, err error) {
+	// Queue block requests
+	blockReqs := make([]rpcclient.FutureGetBlockVerboseTxResult, len(hashes))
+	for i, blockHash := range hashes {
+		blockReqs[i] = client.GetBlockVerboseTxAsync(blockHash)
+	}
+	// Send
+	client.Send()
+	// Receive block requests
+	blocks = make([]*btcjson.GetBlockVerboseTxResult, len(hashes))
+	for i, req := range blockReqs {
+		blocks[i], err = req.Receive()
+		if err != nil {
+			return nil, err
+		}
+	}
+	return blocks, nil
+}
+
+// GetBlocksByRange returns raw blocks from the server given a range (inclusive) of block numbers.
+func (client *RPCClient) GetBlocksByRange(minBlockNumber, maxBlockNumber int64) (blocks []*wire.MsgBlock, err error) {
+	blockHashes, err := client.GetBlockHashesByRange(minBlockNumber, maxBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	blocks, err = client.GetBlocksByHashes(blockHashes)
+	if err != nil {
+		return nil, err
+	}
 	return blocks, nil
 }
 
 // GetBlocksVerboseByRange returns data structures from the server with information
 // about block given a range of block numbers.
-func (client *RPCClient) GetBlocksVerboseByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseResult, error) {
-	return nil, nil
+func (client *RPCClient) GetBlocksVerboseByRange(minBlockNumber, maxBlockNumber int64) (blocks []*btcjson.GetBlockVerboseResult, err error) {
+	hashes, err := client.GetBlockHashesByRange(minBlockNumber, maxBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	blocks, err = client.GetBlocksVerboseByHashes(hashes)
+	if err != nil {
+		return nil, err
+	}
+	return blocks, nil
 }
 
 // GetBlocksVerboseTxByRange returns data structures from the server with information
 // about blocks and their transactions given a range of block numbers.
-func (client *RPCClient) GetBlocksVerboseTxByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseTxResult, error) {
-	return nil, nil
+func (client *RPCClient) GetBlocksVerboseTxByRange(minBlockNumber, maxBlockNumber int64) (blocks []*btcjson.GetBlockVerboseTxResult, err error) {
+	hashes, err := client.GetBlockHashesByRange(minBlockNumber, maxBlockNumber)
+	if err != nil {
+		return nil, err
+	}
+	blocks, err = client.GetBlocksVerboseTxByHashes(hashes)
+	if err != nil {
+		return nil, err
+	}
+	return blocks, nil
 }
