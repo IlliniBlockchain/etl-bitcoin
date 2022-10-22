@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/btcsuite/btcd/btcutil"
+	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
@@ -23,10 +24,11 @@ func GetTestRPCClient() (*RPCClient, error) {
 
 type RPCClientTestSuite struct {
 	suite.Suite
-	BlockCount int64
-	Client     *RPCClient
-	WalletName string
-	Address    btcutil.Address
+	Client      *RPCClient
+	WalletName  string
+	Address     btcutil.Address
+	BlockCount  int64
+	BlockHashes []*chainhash.Hash
 }
 
 func (suite *RPCClientTestSuite) SetupSuite() {
@@ -57,6 +59,13 @@ func (suite *RPCClientTestSuite) SetupSuite() {
 	assert.EqualValues(suite.T(), nBlocks, len(hashes))
 	suite.BlockCount = nBlocks
 
+	// Set block hashes
+	genBlockHashReq := client.GetBlockHashAsync(0)
+	client.Send()
+	genBlockHash, err := genBlockHashReq.Receive()
+	assert.NoError(suite.T(), err)
+	suite.BlockHashes = append([]*chainhash.Hash{genBlockHash}, hashes...)
+
 }
 
 func (suite *RPCClientTestSuite) TestSanityBlockCount() {
@@ -67,6 +76,16 @@ func (suite *RPCClientTestSuite) TestSanityBlockCount() {
 	blockCount, err := blockCountReq.Receive()
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), suite.BlockCount, blockCount)
+}
+func (suite *RPCClientTestSuite) TestGetHashesByRange() {
+
+	client := suite.Client
+	var nBlocks int64 = 10
+	hashes, err := client.GetBlockHashesByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
+	assert.NoError(suite.T(), err)
+	assert.EqualValues(suite.T(), nBlocks, len(hashes))
+	assert.ElementsMatch(suite.T(), suite.BlockHashes[suite.BlockCount-nBlocks+1:suite.BlockCount+1], hashes)
+
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
