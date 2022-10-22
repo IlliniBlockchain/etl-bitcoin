@@ -20,7 +20,7 @@ docker.start: ## Start docker containers
 		-rpcpassword=test
 
 docker.start.bitcoin-core: ## Start bitcoin-core docker container
-	docker run --rm -it \
+	@docker run --rm -d \
 		-p 18443:18443 \
 		-p 18444:18444 \
 		ruimarinho/bitcoin-core \
