@@ -7,17 +7,7 @@ GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
 all: build
 
-docker.start: ## Start docker containers
-	@docker run --rm -d \
-		-p 18443:18443 \
-		-p 18444:18444 \
-		ruimarinho/bitcoin-core \
-		-printtoconsole \
-		-regtest=1 \
-		-rpcallowip=172.17.0.0/16 \
-		-rpcbind=0.0.0.0 \
-		-rpcuser=test \
-		-rpcpassword=test
+docker.start: docker.start.bitcoin-core ## Start docker containers
 
 docker.start.bitcoin-core: ## Start bitcoin-core docker container
 	@docker run --rm -d \
@@ -47,9 +37,9 @@ test.unit: ## Run unit tests
 
 test.integration: test.integration.rpcclient ## Run integration tests
 
-test.integration.rpcclient: docker.stop docker.start.bitcoin-core ## Run rpcclient integration tests
+test.integration.rpcclient: docker.start.bitcoin-core ## Run rpcclient integration tests
 	@go test -run Integration -run RPCClient ${PKG_LIST}
-	@docker-compose down
+	make docker.stop
 
 race: dep ## Run data race detector
 	@go test -race -short ${PKG_LIST}
