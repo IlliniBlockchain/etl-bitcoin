@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestCreateRPCClientPing(t *testing.T) {
+func TestNewRPCClient(t *testing.T) {
 	connCfg := &rpcclient.ConnConfig{
 		Host:         "localhost:8332",
 		User:         "user",
@@ -15,7 +15,6 @@ func TestCreateRPCClientPing(t *testing.T) {
 		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   true, // Bitcoin core does not provide TLS by default
 	}
-
 	_, err := New(connCfg, nil)
 	assert.NoError(t, err)
 }

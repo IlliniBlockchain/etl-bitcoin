@@ -17,10 +17,5 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 	client := RPCClient{
 		internal_client,
 	}
-	tries := 1
-	err = client.Connect(tries)
-	if err != nil {
-		return nil, err
-	}
 	return &client, nil
 }
