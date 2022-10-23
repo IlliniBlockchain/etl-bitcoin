@@ -81,7 +81,7 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 
 	client := suite.Client
 	var nBlocks int64 = 10
-	hashes, err := client.GetBlockHashesByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
+	hashes, err := client.getBlockHashesByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), nBlocks, len(hashes))
 	assert.ElementsMatch(suite.T(), suite.BlockHashes[suite.BlockCount-nBlocks+1:suite.BlockCount+1], hashes)
