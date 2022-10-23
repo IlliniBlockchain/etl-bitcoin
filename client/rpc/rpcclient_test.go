@@ -80,6 +80,63 @@ func (suite *RPCClientTestSuite) TestSanityBlockCount() {
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), suite.BlockCount, blockCount)
 }
+
+type RangeArgs struct {
+	minBlockNumber int64
+	maxBlockNumber int64
+}
+
+type HashTest struct {
+	name    string
+	args    RangeArgs
+	want    []*chainhash.Hash
+	wantErr bool
+}
+
+func GetHashTestTable(suite *RPCClientTestSuite) []HashTest {
+
+	if len(suite.BlockHashes) < 5 {
+		panic("Test blockchain must have 5 or more blocks.")
+	}
+
+	return []HashTest{
+		{
+			name: "genesis_single_block",
+			args: RangeArgs{0, 0},
+			want: suite.BlockHashes[0:1],
+		},
+		{
+			name: "first_and_second_blocks",
+			args: RangeArgs{1, 2},
+			want: suite.BlockHashes[1:3],
+		},
+		{
+			name: "latest_five_blocks",
+			args: RangeArgs{int64(len(suite.BlockHashes) - 4), int64(len(suite.BlockHashes))},
+			want: suite.BlockHashes[len(suite.BlockHashes)-5:],
+		},
+		{
+			name:    "negative_range",
+			args:    RangeArgs{-2, 2},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "reverse_range",
+			args:    RangeArgs{4, 2},
+			want:    nil,
+			wantErr: true,
+		},
+		{
+			name:    "future_range",
+			args:    RangeArgs{int64(len(suite.BlockHashes) - 2), int64(len(suite.BlockHashes) + 2)},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+}
+
 func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 
 	client := suite.Client
@@ -98,7 +155,6 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 	blocks, err := client.GetBlocksByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), nBlocks, len(blocks))
-	// How to test values?
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
