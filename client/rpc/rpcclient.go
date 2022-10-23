@@ -1,6 +1,9 @@
 package rpcclient
 
 import (
+	"fmt"
+	"log"
+
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
@@ -27,6 +30,14 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 // getBlockHashesByRange returns block hashes from the server given a range (inclusive) of block numbers.
 // Hashes are returned in order from `minBlockNumber` to `maxBlockNumber`
 func (client *RPCClient) getBlockHashesByRange(minBlockNumber, maxBlockNumber int64) (hashes []*chainhash.Hash, err error) {
+	if minBlockNumber > maxBlockNumber {
+		log.Printf("minBlockNumber: %d\tmaxBlockNumber: %d\n", minBlockNumber, maxBlockNumber)
+		return nil, fmt.Errorf(
+			"minBlockNumber (%d) must be less than or equal to maxBlockNumber (%d)",
+			minBlockNumber,
+			maxBlockNumber,
+		)
+	}
 	nBlocks := maxBlockNumber - minBlockNumber + 1
 
 	// Queue block hash requests
