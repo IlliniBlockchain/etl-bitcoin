@@ -3,12 +3,15 @@ package rpcclient
 import (
 	"testing"
 
+	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
+
+var _ client.Client = (*RPCClient)(nil)
 
 func GetTestRPCClient() (*RPCClient, error) {
 	connCfg := &rpcclient.ConnConfig{
