@@ -155,6 +155,7 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 	blocks, err := client.GetBlocksByRange(suite.BlockCount-nBlocks+1, suite.BlockCount)
 	assert.NoError(suite.T(), err)
 	assert.EqualValues(suite.T(), nBlocks, len(blocks))
+
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
