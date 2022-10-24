@@ -3,7 +3,7 @@ PKG := "github.com/IlliniBlockchain/$(PROJECT_NAME)"
 PKG_LIST := $(shell go list ${PKG}/... | grep -v /vendor/ | grep -v mocks)
 GO_FILES := $(shell find . -name '*.go' | grep -v /vendor/ | grep -v _test.go)
 
-.PHONY: all dep build clean test coverage coverhtml lint docker.start docker.stop docker.restart test.unit test.integration test.integration.rpcclient
+.PHONY: all dep build clean test coverage coverhtml lint docker.start docker.stop test.unit test.integration test.integration.rpcclient
 
 all: build
 
@@ -19,10 +19,10 @@ docker.start.bitcoin-core: ## Start bitcoin-core docker container
 		-rpcallowip=172.17.0.0/16 \
 		-rpcbind=0.0.0.0 \
 		-rpcuser=test \
-		-rpcpassword=test
+		-rpcpassword=test > /dev/null
 
 docker.stop: ## Stop docker containers
-	@docker stop $$(docker ps -q)
+	@docker stop $$(docker ps -q) > /dev/null
 
 lint: ## Lint the files
 	@golangci-lint run
@@ -38,8 +38,7 @@ test.unit: ## Run unit tests
 test.integration: test.integration.rpcclient ## Run integration tests
 
 test.integration.rpcclient: docker.start.bitcoin-core ## Run rpcclient integration tests
-	@go test -run Integration -run RPCClient ${PKG_LIST}
-	@make docker.stop
+	@go test -run RPCClient ${PKG_LIST}; make docker.stop > /dev/null
 
 race: dep ## Run data race detector
 	@go test -race -short ${PKG_LIST}
