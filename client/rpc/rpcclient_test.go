@@ -148,6 +148,28 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	}
 }
 
+func (suite *RPCClientTestSuite) TestGetBlockHeadersByRange() {
+	tests := GetHashTestTable(suite)
+	for _, tt := range tests {
+		suite.Run(tt.name, func() {
+			blockHeaders, err := suite.Client.GetBlockHeadersByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			if tt.wantErr {
+				assert.Error(suite.T(), err)
+				return
+			}
+			assert.NoError(suite.T(), err)
+
+			hashes := make([]*chainhash.Hash, len(blockHeaders))
+			for i, block := range blockHeaders {
+				hash, err := chainhash.NewHashFromStr(block.Hash())
+				assert.NoError(suite.T(), err)
+				hashes[i] = hash
+			}
+			assert.ElementsMatch(suite.T(), tt.want, hashes)
+		})
+	}
+}
+
 func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
@@ -161,56 +183,78 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 
 			hashes := make([]*chainhash.Hash, len(blocks))
 			for i, block := range blocks {
-				hash := block.BlockHash()
-				hashes[i] = &hash
-			}
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
-		})
-	}
-}
-
-func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
-	tests := GetHashTestTable(suite)
-	for _, tt := range tests {
-		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
-			if tt.wantErr {
-				assert.Error(suite.T(), err)
-				return
-			}
-			assert.NoError(suite.T(), err)
-
-			hashes := make([]*chainhash.Hash, len(blocks))
-			for i, block := range blocks {
-				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
+				hash, err := chainhash.NewHashFromStr(block.Hash())
 				assert.NoError(suite.T(), err)
+				hashes[i] = hash
 			}
 			assert.ElementsMatch(suite.T(), tt.want, hashes)
 		})
 	}
 }
 
-func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
-	tests := GetHashTestTable(suite)
-	for _, tt := range tests {
-		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
-			if tt.wantErr {
-				assert.Error(suite.T(), err)
-				return
-			}
-			assert.NoError(suite.T(), err)
+// func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
+// 	tests := GetHashTestTable(suite)
+// 	for _, tt := range tests {
+// 		suite.Run(tt.name, func() {
+// 			blocks, err := suite.Client.GetBlocksByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+// 			if tt.wantErr {
+// 				assert.Error(suite.T(), err)
+// 				return
+// 			}
+// 			assert.NoError(suite.T(), err)
 
-			hashes := make([]*chainhash.Hash, len(blocks))
-			for i, block := range blocks {
-				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
-				assert.NoError(suite.T(), err)
-			}
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
-		})
-	}
+// 			hashes := make([]*chainhash.Hash, len(blocks))
+// 			for i, block := range blocks {
+// 				hash := block.BlockHash()
+// 				hashes[i] = &hash
+// 			}
+// 			assert.ElementsMatch(suite.T(), tt.want, hashes)
+// 		})
+// 	}
+// }
 
-}
+// func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
+// 	tests := GetHashTestTable(suite)
+// 	for _, tt := range tests {
+// 		suite.Run(tt.name, func() {
+// 			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+// 			if tt.wantErr {
+// 				assert.Error(suite.T(), err)
+// 				return
+// 			}
+// 			assert.NoError(suite.T(), err)
+
+// 			hashes := make([]*chainhash.Hash, len(blocks))
+// 			for i, block := range blocks {
+// 				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
+// 				assert.NoError(suite.T(), err)
+// 			}
+// 			assert.ElementsMatch(suite.T(), tt.want, hashes)
+// 		})
+// 	}
+// }
+
+// func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
+// 	tests := GetHashTestTable(suite)
+// 	for _, tt := range tests {
+// 		suite.Run(tt.name, func() {
+// 			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+// 			if tt.wantErr {
+// 				assert.Error(suite.T(), err)
+// 				return
+// 			}
+// 			assert.NoError(suite.T(), err)
+
+// 			hashes := make([]*chainhash.Hash, len(blocks))
+// 			for i, block := range blocks {
+// 				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
+// 				assert.NoError(suite.T(), err)
+// 			}
+// 			assert.ElementsMatch(suite.T(), tt.want, hashes)
+// 		})
+// 	}
+
+// }
 
 func TestRPCClientTestSuite(t *testing.T) {
 	if testing.Short() {
