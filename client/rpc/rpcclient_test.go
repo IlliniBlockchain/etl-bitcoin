@@ -137,7 +137,7 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			hashes, err := suite.Client.getBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			hashes, err := suite.Client.GetBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
 			if tt.wantErr {
 				assert.Error(suite.T(), err)
 				return
