@@ -24,7 +24,6 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 	client := RPCClient{
 		internal_client,
 	}
-
 	return &client, nil
 }
 

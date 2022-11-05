@@ -1,6 +1,7 @@
 package client
 
 import (
+	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/wire"
@@ -31,12 +32,25 @@ type Client interface {
 	GetTxOut(txHash *chainhash.Hash, index uint32, mempool bool) (*btcjson.GetTxOutResult, error)
 	// GetRawMempool returns the hashes of all transactions in the memory pool.
 	GetRawMempool() ([]*chainhash.Hash, error)
-	// GetBlocksByRange returns raw blocks from the server given a range of block numbers.
-	GetBlocksByRange(minBlockNumber, maxBlockNumber int64) ([]*wire.MsgBlock, error)
-	// GetBlocksVerboseByRange returns data structures from the server with information
-	// about block given a range of block numbers.
-	GetBlocksVerboseByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseResult, error)
-	// GetBlocksVerboseTxByRange returns data structures from the server with information
-	// about blocks and their transactions given a range of block numbers.
-	GetBlocksVerboseTxByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseTxResult, error)
+	// // GetBlocksByRange returns raw blocks from the server given a range of block numbers.
+	// GetBlocksByRange(minBlockNumber, maxBlockNumber int64) ([]*wire.MsgBlock, error)
+	// // GetBlocksVerboseByRange returns data structures from the server with information
+	// // about block given a range of block numbers.
+	// GetBlocksVerboseByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseResult, error)
+	// // GetBlocksVerboseTxByRange returns data structures from the server with information
+	// // about blocks and their transactions given a range of block numbers.
+	// GetBlocksVerboseTxByRange(minBlockNumber, maxBlockNumber int64) ([]*btcjson.GetBlockVerboseTxResult, error)
+
+	// GetBlockHashesByRange returns block hashes from the server given a range (inclusive) of block numbers.
+	// Hashes are returned in order from `minBlockNumber` to `maxBlockNumber`
+	GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error)
+	// GetBlockHeadersByHashes returns block headers from the server given a list of block hashes.
+	GetBlockHeadersByHashes(hashes []*chainhash.Hash) ([]*types.BlockHeader, error)
+	// GetBlocksByHashes returns blocks with transactions from the server given a list of block hashes.
+	GetBlocksByHashes(hashes []*chainhash.Hash) ([]*types.Block, error)
+	// GetBlockHeadersByRange returns raw blocks from the server given a range of block numbers.
+	GetBlockHeadersByRange(minBlockNumber, maxBlockNumber int64) ([]*types.BlockHeader, error)
+	// GetBlocksByRange returns data structures from the server with information about
+	// blocks and their transactions given a range of block numbers.
+	GetBlocksByRange(minBlockNumber, maxBlockNumber int64) ([]*types.Block, error)
 }
