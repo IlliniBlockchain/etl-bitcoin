@@ -1,6 +1,10 @@
 package types
 
-import "github.com/btcsuite/btcd/btcjson"
+import (
+	"fmt"
+
+	"github.com/btcsuite/btcd/btcjson"
+)
 
 // Transaction represents a Bitcoin transaction.
 //
@@ -11,11 +15,29 @@ type Transaction struct {
 }
 
 // NewTransaction creates a new transaction from raw json result.
-func NewTransaction(tx btcjson.TxRawResult, block *Block) *Transaction {
+func NewTransaction(tx btcjson.TxRawResult) *Transaction {
 	return &Transaction{
 		tx,
-		block,
+		nil,
 	}
+}
+
+// NewTransactionWithBlock creates a new transaction from raw json result and its block.
+func NewTransactionWithBlock(tx btcjson.TxRawResult, block *Block) (*Transaction, error) {
+	return NewTransaction(tx).WithBlock(block)
+}
+
+// WithBlock stores a reference to the block that contains the transaction.
+func (tx *Transaction) WithBlock(block *Block) (*Transaction, error) {
+	if block == nil {
+		return tx, nil
+	}
+	if tx.BlockHash() != block.Hash() {
+		return nil, fmt.Errorf("block hash mismatch: %s != %s", tx.BlockHash(), block.Hash())
+	}
+	cpy := *block
+	tx.block = &cpy
+	return tx, nil
 }
 
 // Hex returns the hex-encoded transaction.
@@ -71,5 +93,5 @@ func (tx *Transaction) Block() *Block {
 
 // String implements the Stringer interface.
 func (tx *Transaction) String() string {
-	return tx.data.Txid
+	return tx.TxID()
 }
