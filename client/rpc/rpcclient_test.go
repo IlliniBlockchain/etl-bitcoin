@@ -148,7 +148,7 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	}
 }
 
-func (suite *RPCClientTestSuite) TestGetBlockHeadersByRange() {
+func (suite *RPCClientTestSuite) TestGetBlockHeaders() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
@@ -157,7 +157,7 @@ func (suite *RPCClientTestSuite) TestGetBlockHeadersByRange() {
 				assert.Error(suite.T(), err)
 				return
 			}
-			blockHeaders, err := suite.Client.GetBlockHeadersByRange(hashes)
+			blockHeaders, err := suite.Client.GetBlockHeaders(hashes)
 			assert.NoError(suite.T(), err)
 
 			blockHeaderHashes := make([]*chainhash.Hash, len(blockHeaders))
@@ -171,7 +171,7 @@ func (suite *RPCClientTestSuite) TestGetBlockHeadersByRange() {
 	}
 }
 
-func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
+func (suite *RPCClientTestSuite) TestGetBlocks() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
@@ -180,7 +180,7 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 				assert.Error(suite.T(), err)
 				return
 			}
-			blocks, err := suite.Client.GetBlocksByRange(hashes)
+			blocks, err := suite.Client.GetBlocks(hashes)
 			assert.NoError(suite.T(), err)
 
 			blockHashes := make([]*chainhash.Hash, len(blocks))

@@ -59,7 +59,7 @@ func (client *RPCClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber in
 }
 
 // GetBlockHeadersByRange returns block headers from the server given a list/range of block hashes.
-func (client *RPCClient) GetBlockHeadersByRange(hashes []*chainhash.Hash) (blockHeaders []*types.BlockHeader, err error) {
+func (client *RPCClient) GetBlockHeaders(hashes []*chainhash.Hash) (blockHeaders []*types.BlockHeader, err error) {
 	// Queue block requests
 	blockReqs := make([]rpcclient.FutureGetBlockHeaderVerboseResult, len(hashes))
 	for i, blockHash := range hashes {
@@ -80,7 +80,7 @@ func (client *RPCClient) GetBlockHeadersByRange(hashes []*chainhash.Hash) (block
 }
 
 // GetBlocksByRange returns blocks with transactions from the server given a list/range of block hashes.
-func (client *RPCClient) GetBlocksByRange(hashes []*chainhash.Hash) (blocks []*types.Block, err error) {
+func (client *RPCClient) GetBlocks(hashes []*chainhash.Hash) (blocks []*types.Block, err error) {
 	// Queue block requests
 	blockReqs := make([]rpcclient.FutureGetBlockVerboseTxResult, len(hashes))
 	for i, blockHash := range hashes {

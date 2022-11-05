@@ -36,7 +36,7 @@ type Client interface {
 	// Hashes are returned in order from `minBlockNumber` to `maxBlockNumber`
 	GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error)
 	// GetBlockHeadersByRange returns block headers from the server given a list/range of block hashes.
-	GetBlockHeadersByRange(hashes []*chainhash.Hash) ([]*types.BlockHeader, error)
+	GetBlockHeaders(hashes []*chainhash.Hash) ([]*types.BlockHeader, error)
 	// GetBlocksByRange returns blocks with transactions from the server given a list/range of block hashes.
-	GetBlocksByRange(hashes []*chainhash.Hash) ([]*types.Block, error)
+	GetBlocks(hashes []*chainhash.Hash) ([]*types.Block, error)
 }
