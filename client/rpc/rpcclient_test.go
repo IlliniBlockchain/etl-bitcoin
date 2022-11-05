@@ -68,11 +68,9 @@ func (suite *RPCClientTestSuite) SetupSuite() {
 	genBlockHash, err := genBlockHashReq.Receive()
 	assert.NoError(suite.T(), err)
 	suite.BlockHashes = append([]*chainhash.Hash{genBlockHash}, hashes...)
-
 }
 
 func (suite *RPCClientTestSuite) TestSanityBlockCount() {
-
 	client := suite.Client
 	blockCountReq := client.GetBlockCountAsync()
 	client.Send()
@@ -94,7 +92,6 @@ type HashTest struct {
 }
 
 func GetHashTestTable(suite *RPCClientTestSuite) []HashTest {
-
 	if len(suite.BlockHashes) < 5 {
 		panic("Test blockchain must have 5 or more blocks.")
 	}
@@ -134,11 +131,9 @@ func GetHashTestTable(suite *RPCClientTestSuite) []HashTest {
 			wantErr: true,
 		},
 	}
-
 }
 
 func (suite *RPCClientTestSuite) TestGetHashesByRange() {
-
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
@@ -154,7 +149,6 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
-
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
@@ -173,11 +167,9 @@ func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
 			assert.ElementsMatch(suite.T(), tt.want, hashes)
 		})
 	}
-
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
-
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
@@ -199,7 +191,6 @@ func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
 }
 
 func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
-
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
