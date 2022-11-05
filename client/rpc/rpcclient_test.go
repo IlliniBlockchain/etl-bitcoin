@@ -222,5 +222,8 @@ func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping RPCClientTestSuite in short mode.")
+	}
 	suite.Run(t, new(RPCClientTestSuite))
 }
