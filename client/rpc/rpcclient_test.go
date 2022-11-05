@@ -209,11 +209,12 @@ func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
 			assert.ElementsMatch(suite.T(), tt.want, hashes)
 		})
 	}
+
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
 	if testing.Short() {
-		t.Skip("Skipping integration test in short mode.")
+		t.Skip("skipping RPCClientTestSuite in short mode.")
 	}
 	suite.Run(t, new(RPCClientTestSuite))
 }
