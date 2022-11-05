@@ -1,7 +1,9 @@
 package rpcclient
 
 import (
+	"math/rand"
 	"testing"
+	"time"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/btcsuite/btcd/btcutil"
@@ -133,11 +135,55 @@ func GetHashTestTable(suite *RPCClientTestSuite) []HashTest {
 	}
 }
 
+type BlockHashTest struct {
+	name    string
+	args    []*chainhash.Hash
+	want    []*chainhash.Hash
+	wantErr bool
+}
+
+func GetBlockHashTestTable(suite *RPCClientTestSuite) []BlockHashTest {
+
+	rand.Seed(time.Now().UnixNano())
+	invalidHashBytes := make([]byte, 256)
+	rand.Read(invalidHashBytes)
+	invalidHash, _ := chainhash.NewHash(invalidHashBytes)
+
+	return []BlockHashTest{
+		{
+			name: "genesis_single_block",
+			args: suite.BlockHashes[0:1],
+			want: suite.BlockHashes[0:1],
+		},
+		{
+			name: "first_and_second_blocks",
+			args: suite.BlockHashes[1:3],
+			want: suite.BlockHashes[1:3],
+		},
+		{
+			name: "latest_five_blocks",
+			args: suite.BlockHashes[len(suite.BlockHashes)-5:],
+			want: suite.BlockHashes[len(suite.BlockHashes)-5:],
+		},
+		{
+			name: "nonsequential_blocks",
+			args: []*chainhash.Hash{suite.BlockHashes[2], suite.BlockHashes[0], suite.BlockHashes[5], suite.BlockHashes[4]},
+			want: []*chainhash.Hash{suite.BlockHashes[2], suite.BlockHashes[0], suite.BlockHashes[5], suite.BlockHashes[4]},
+		},
+		{
+			name:    "invalid_hash",
+			args:    []*chainhash.Hash{suite.BlockHashes[3], invalidHash},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+}
+
 func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			hashes, err := suite.Client.getBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			hashes, err := suite.Client.GetBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
 			if tt.wantErr {
 				assert.Error(suite.T(), err)
 				return
@@ -148,68 +194,48 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	}
 }
 
-func (suite *RPCClientTestSuite) TestGetBlocksByRange() {
-	tests := GetHashTestTable(suite)
+func (suite *RPCClientTestSuite) TestGetBlockHeaders() {
+	tests := GetBlockHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocksByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			blockHeaders, err := suite.Client.GetBlockHeaders(tt.args)
 			if tt.wantErr {
 				assert.Error(suite.T(), err)
 				return
 			}
 			assert.NoError(suite.T(), err)
 
-			hashes := make([]*chainhash.Hash, len(blocks))
-			for i, block := range blocks {
-				hash := block.BlockHash()
-				hashes[i] = &hash
-			}
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
-		})
-	}
-}
-
-func (suite *RPCClientTestSuite) TestGetBlocksVerboseByRange() {
-	tests := GetHashTestTable(suite)
-	for _, tt := range tests {
-		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
-			if tt.wantErr {
-				assert.Error(suite.T(), err)
-				return
-			}
-			assert.NoError(suite.T(), err)
-
-			hashes := make([]*chainhash.Hash, len(blocks))
-			for i, block := range blocks {
-				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
+			blockHeaderHashes := make([]*chainhash.Hash, len(blockHeaders))
+			for i, block := range blockHeaders {
+				hash, err := chainhash.NewHashFromStr(block.Hash())
 				assert.NoError(suite.T(), err)
+				blockHeaderHashes[i] = hash
 			}
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
+			assert.ElementsMatch(suite.T(), tt.want, blockHeaderHashes)
 		})
 	}
 }
 
-func (suite *RPCClientTestSuite) TestGetBlocksVerboseTxByRange() {
-	tests := GetHashTestTable(suite)
+func (suite *RPCClientTestSuite) TestGetBlocks() {
+	tests := GetBlockHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocksVerboseByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			blocks, err := suite.Client.GetBlocks(tt.args)
 			if tt.wantErr {
 				assert.Error(suite.T(), err)
 				return
 			}
 			assert.NoError(suite.T(), err)
 
-			hashes := make([]*chainhash.Hash, len(blocks))
+			blockHashes := make([]*chainhash.Hash, len(blocks))
 			for i, block := range blocks {
-				hashes[i], err = chainhash.NewHashFromStr(block.Hash)
+				hash, err := chainhash.NewHashFromStr(block.Hash())
 				assert.NoError(suite.T(), err)
+				blockHashes[i] = hash
 			}
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
+			assert.ElementsMatch(suite.T(), tt.want, blockHashes)
 		})
 	}
-
 }
 
 func TestRPCClientTestSuite(t *testing.T) {
