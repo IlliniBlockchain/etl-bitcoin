@@ -123,7 +123,11 @@ func NewBlock(blockVerbose btcjson.GetBlockVerboseTxResult) *Block {
 		make([]*Transaction, len(blockVerbose.Tx)),
 	}
 	for i, tx := range blockVerbose.Tx {
-		block.txs[i] = NewTransaction(tx, block)
+		tx.BlockHash = block.Hash()
+		tx.Blocktime = block.Time()
+		tx.Time = block.Time()
+		tx.Confirmations = uint64(block.Confirmations())
+		block.txs[i], _ = NewTransactionWithBlock(tx, block)
 	}
 	return block
 }
