@@ -103,11 +103,19 @@ func (bh *BlockHeader) String() string {
 }
 
 // WithTransactions returns a Block with the given transactions.
-func (bh *BlockHeader) WithTransactions(txs []*Transaction) *Block {
-	return &Block{
+func (bh *BlockHeader) WithTransactions(txs []btcjson.TxRawResult) (*Block, error) {
+	block := &Block{
 		*bh,
-		txs,
+		make([]*Transaction, len(txs)),
 	}
+	var err error
+	for i, tx := range txs {
+		block.txs[i], err = NewTransactionWithBlock(tx, block)
+		if err != nil {
+			return nil, err
+		}
+	}
+	return block, nil
 }
 
 // Block represents a block header with its transactions.
@@ -116,7 +124,7 @@ type Block struct {
 	txs []*Transaction
 }
 
-// NewBlock returns a new instance of a block from a raw json block.
+// NewBlock returns a new instance of a block from a raw json block with verbosity = 2.
 func NewBlock(blockVerbose btcjson.GetBlockVerboseTxResult) *Block {
 	block := &Block{
 		*NewBlockHeaderFromVerboseTx(blockVerbose),
