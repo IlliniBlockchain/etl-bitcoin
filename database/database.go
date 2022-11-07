@@ -1,21 +1,33 @@
 package database
 
-import "github.com/IlliniBlockchain/etl-bitcoin/types"
+import (
+	"fmt"
+
+	"github.com/IlliniBlockchain/etl-bitcoin/types"
+)
 
 // Database represents a database connection.
 type Database interface {
 	// Ideating the main processes
-	SaveBlocks()
+	SaveBlocks([]*types.Block)
 	UploadBlocks()
-	SaveTransactions()
+	SaveTransactions([]*types.Transaction)
 	UploadTransactions()
 }
 
 type Neo4j struct {
 }
 
+func NewNeo4j() *Neo4j {
+	db := Neo4j{}
+	return &db
+}
+
 // Implement Database interface
-func (db *Neo4j) SaveBlocks() {
+func (db *Neo4j) SaveBlocks(blocks []*types.Block) {
+	for _, block := range blocks {
+		fmt.Println(block.Hash())
+	}
 
 }
 
@@ -23,7 +35,10 @@ func (db *Neo4j) UploadBlocks() {
 
 }
 
-func (db *Neo4j) SaveTransactions() {
+func (db *Neo4j) SaveTransactions(txs []*types.Transaction) {
+	for _, tx := range txs {
+		fmt.Println(tx.Hash())
+	}
 
 }
 
