@@ -156,18 +156,5 @@ func (cf *csvFile) writeAll(records [][]string) error {
 	return nil
 }
 
-type csvMsg struct {
-	fileKey string
-}
-
-type csvInsert struct {
-	csvMsg
-	records []CSVRecord
-}
-
-func newInsertMsg(fileKey string, records []CSVRecord) *csvInsert {
-	return &csvInsert{
-		csvMsg:  csvMsg{fileKey: fileKey},
-		records: records,
-	}
+	return s
 }
