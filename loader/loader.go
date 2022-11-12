@@ -2,28 +2,42 @@ package loader
 
 import (
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
+	rpcclient "github.com/IlliniBlockchain/etl-bitcoin/client/rpc"
+	"github.com/IlliniBlockchain/etl-bitcoin/csv"
+	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // General idea for loader:
-// Represents a single entire process of getting data from one place to another.
-// It takes in clients (RPC or DB) and conducts a designated process by using them.
+// Represents a single entire process of getting data from a source to a destination.
+// It takes in clients (RPC or DB) and implements the loading process for transporting
+// data between them.
+
+// LoaderOptions represents a map of arbitrary options when constructing a loader.
+type LoaderOptions map[string]interface{}
 
 // ClientDatabaseLoader represents any process of loading data from a
-// Client to a Database
+// Client to a Database.
 type ClientDatabaseLoader interface {
+	Run()
 }
+
+type ClientDBLoaderConstructor func(client client.Client, db database.Database, opts LoaderOptions) (ClientDatabaseLoader, error)
 
 // DatabaseLoader represents any process of loading data from one type of
 // Database to another.
 type DatabaseLoader interface {
 }
 
+type DBLoaderConstructor func(srcDb, dstDb database.Database, opts LoaderOptions) (DBLoaderConstructor, error)
+
 // RPCCSVLoader represents the loading process for retrieving data from
 // a full node and saving it to disk as CSVs. Will implement
 // ClientDatabaseLoader.
 type RPCCSVLoader struct {
+	client *rpcclient.RPCClient
+	db     *csv.CSVDatabase
 }
 
 // CSVNeo4jLoader represents the loading process for uploading CSV data
