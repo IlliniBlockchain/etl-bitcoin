@@ -30,7 +30,7 @@ func NewTransactionWithBlock(tx btcjson.TxRawResult, block *Block) (*Transaction
 // WithBlock stores a reference to the block that contains the transaction.
 func (tx *Transaction) WithBlock(block *Block) (*Transaction, error) {
 	if block == nil {
-		return tx, fmt.Errorf("block is nil")
+		return nil, fmt.Errorf("block is nil")
 	}
 	if tx.BlockHash() != block.Hash() {
 		return nil, fmt.Errorf("block hash mismatch: %s != %s", tx.BlockHash(), block.Hash())
