@@ -1,9 +1,10 @@
 package loader
 
 import (
+	"fmt"
+	"sync"
+
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
-	rpcclient "github.com/IlliniBlockchain/etl-bitcoin/client/rpc"
-	"github.com/IlliniBlockchain/etl-bitcoin/csv"
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -19,30 +20,100 @@ type LoaderOptions map[string]interface{}
 
 // ClientDatabaseLoader represents any process of loading data from a
 // Client to a Database.
-type ClientDatabaseLoader interface {
+type Loader interface {
 	Run()
 }
 
-type ClientDBLoaderConstructor func(client client.Client, db database.Database, opts LoaderOptions) (ClientDatabaseLoader, error)
+type ClientDBLoaderConstructor func(client client.Client, db database.Database, opts LoaderOptions) (Loader, error)
 
-// DatabaseLoader represents any process of loading data from one type of
-// Database to another.
-type DatabaseLoader interface {
+type ClientDBLoader struct {
+	client client.Client
+	db     database.Database
+
+	maxWorkers int
+	dbTxs      sync.Map
+	msgs       chan interface{}
+
+	// rangeChan chan BlockRange
+	// hashChan  chan []*chainhash.Hash
+	// blockChan chan []*types.Block
 }
 
-type DBLoaderConstructor func(srcDb, dstDb database.Database, opts LoaderOptions) (DBLoaderConstructor, error)
-
-// RPCCSVLoader represents the loading process for retrieving data from
-// a full node and saving it to disk as CSVs. Will implement
-// ClientDatabaseLoader.
-type RPCCSVLoader struct {
-	client *rpcclient.RPCClient
-	db     *csv.CSVDatabase
+type BlockRange struct {
+	startBlockHeight int64
+	endBlockHeight   int64
 }
 
-// CSVNeo4jLoader represents the loading process for uploading CSV data
-// into Neo4j. Will implement DatabaseLoader.
-type CSVNeo4jLoader struct {
+func NewClientDBLoader(client client.Client, db database.Database, opts LoaderOptions, maxWorkers int) (*ClientDBLoader, error) {
+	// initialize channels
+	msgs := make(chan interface{})
+	loader := &ClientDBLoader{
+		client:     client,
+		db:         db,
+		msgs:       msgs,
+		maxWorkers: maxWorkers,
+	}
+
+	// start workers
+	for i := 0; i < maxWorkers; i++ {
+		go loader.loaderWorker()
+	}
+
+	return loader, nil
+}
+
+func (loader *ClientDBLoader) Run(blockRange BlockRange, dbTx database.DBTx) {
+	// Associate blockRange with tx
+	loader.dbTxs.Store(blockRange, &dbTx)
+	// Send blockRange
+	loader.msgs <- blockRange
+}
+
+func (loader *ClientDBLoader) loaderWorker() error {
+	for msg := range loader.msgs {
+		// split this into individual functions to handle
+		switch msg := msg.(type) {
+		case BlockRange:
+			blockRange := msg
+			hashes, err := BlockRangesToHashes(loader.client, blockRange.startBlockHeight, blockRange.endBlockHeight)
+			if err != nil {
+				return err
+			}
+			loader.msgs <- hashes
+		case []*chainhash.Hash:
+			hashes := msg
+			blocks, err := HashesToBlocks(loader.client, hashes)
+			if err != nil {
+				return err
+			}
+			loader.msgs <- blocks
+		case []*types.Block:
+			blocks := msg
+			headers := make([]*types.BlockHeader, 0, len(blocks))
+			txs := make([]*types.Transaction, 0, len(blocks))
+			for _, block := range blocks {
+				headers = append(headers, &block.BlockHeader)
+				txs = append(txs, block.Transactions()...)
+			}
+			loader.msgs <- headers
+			loader.msgs <- txs
+		case []*types.BlockHeader:
+			headers := msg
+			dbTx := nil // will retrieve from somewhere
+			for _, header := range headers {
+				dbTx.AddBlockHeader(header)
+			}
+		case []*types.Transaction:
+			txs := msg
+			dbTx := nil
+			for _, tx := range txs {
+				dbTx.AddTransaction(tx)
+			}
+		default:
+			return fmt.Errorf("unknown message type %T", msg)
+		}
+	}
+	return nil
 }
 
 // Just write some functions that are needed and reorganize later
