@@ -20,9 +20,9 @@ type Database interface {
 // DBTx represents a database transaction to make atomic changes to a database.
 type DBTx interface {
 	// AddBlockHeader adds block header data to this database transaction.
-	AddBlockHeader(blockheaders *types.BlockHeader) error
+	AddBlockHeader(blockheaders *types.BlockHeader)
 	// AddTransaction adds transaction data to this database transaction.
-	AddTransaction(tx *types.Transaction) error
+	AddTransaction(tx *types.Transaction)
 	// Commit commits this database transaction to a database.
 	Commit() error
 }
