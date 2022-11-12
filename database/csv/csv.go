@@ -12,14 +12,14 @@ import (
 
 type CSVRecord interface {
 	Headers() []string
-	Row() []string
+	Row() []any
 }
 
 type CSVDatabase struct {
 	csv_files  sync.Map
 	maxWorkers int
 
-	msgs chan interface{}
+	msgs chan CSVMsg
 
 	ctx      context.Context
 	cancel   context.CancelFunc
@@ -64,14 +64,39 @@ func (db *CSVDatabase) Close() error {
 	return db.g.Wait()
 }
 
-func (db *CSVDatabase) SendMsg(msg interface{}) {
+func (db *CSVDatabase) SendMsgAsync(msg CSVMsg) error {
+	if db.ctx.Err() != nil {
+		return db.ctx.Err()
+	}
 	db.msgs <- msg
+	return nil
 }
 
-func (db *CSVDatabase) insert(msg *csvInsert) error {
-	val, ok := db.csv_files.Load(msg.fileKey)
+func (db *CSVDatabase) SendMsg(msg CSVMsg) error {
+	if err := db.SendMsgAsync(msg); err != nil {
+		return err
+	}
+	return msg.Wait()
+}
+
+func (db *CSVDatabase) SendMsgs(msgs []CSVMsg) error {
+	for _, msg := range msgs {
+		if err := db.SendMsgAsync(msg); err != nil {
+			return err
+		}
+	}
+	for _, msg := range msgs {
+		if err := msg.Wait(); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (db *CSVDatabase) insert(msg *CSVInsertMsg) error {
+	val, ok := db.csv_files.Load(msg.FileKey())
 	if !ok {
-		return fmt.Errorf("csv file not found for %s", msg.fileKey)
+		return fmt.Errorf("csv file not found for %s", msg.FileKey())
 	}
 	if len(msg.records) == 0 {
 		return nil
@@ -83,7 +108,7 @@ func (db *CSVDatabase) insert(msg *csvInsert) error {
 		records = append(records, msg.records[0].Headers())
 	}
 	for _, record := range msg.records {
-		records = append(records, record.Row())
+		records = append(records, anyRowToString(record.Row()))
 	}
 	if err := csvFile.writeAll(records); err != nil {
 		return err
@@ -94,10 +119,8 @@ func (db *CSVDatabase) insert(msg *csvInsert) error {
 func (db *CSVDatabase) csvWorker() error {
 	for msg := range db.msgs {
 		switch msg := msg.(type) {
-		case *csvInsert:
-			if err := db.insert(msg); err != nil {
-				return err
-			}
+		case *CSVInsertMsg:
+			msg.finish(db.insert(msg))
 		default:
 			return fmt.Errorf("unknown message type %T", msg)
 		}
@@ -156,5 +179,10 @@ func (cf *csvFile) writeAll(records [][]string) error {
 	return nil
 }
 
+func anyRowToString(row []any) []string {
+	s := make([]string, len(row))
+	for i, v := range row {
+		s[i] = fmt.Sprint(v)
+	}
 	return s
 }
