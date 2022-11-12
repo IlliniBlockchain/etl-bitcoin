@@ -5,7 +5,6 @@ import (
 	"log"
 
 	rpc "github.com/IlliniBlockchain/etl-bitcoin/client/rpc"
-	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/loader"
 	rpcclient "github.com/btcsuite/btcd/rpcclient"
 )
@@ -13,7 +12,7 @@ import (
 func main() {
 	client := newTestClient()
 	defer client.Shutdown()
-	db := database.NewNeo4j()
+	// db := database.NewNeo4j()
 
 	setupBlocks(*client.Client)
 
@@ -47,11 +46,15 @@ func main() {
 			log.Fatal(err)
 		}
 
+		for _, tx := range txs {
+			fmt.Println(tx.Hash())
+		}
+
 		// sending stuff to database
-		fmt.Println("BLOCKS:")
-		db.SaveBlocks(blocks)
-		fmt.Println("TXS:")
-		db.SaveTransactions(txs)
+		// fmt.Println("BLOCKS:")
+		// db.SaveBlocks(blocks)
+		// fmt.Println("TXS:")
+		// db.SaveTransactions(txs)
 
 		currStart += blockRangeInterval
 	}

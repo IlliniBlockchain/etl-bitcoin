@@ -2,35 +2,36 @@ package loader
 
 import (
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
-	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
-// Loader represents loading process from a bitcoin client.
-type XLoader interface {
+// General idea for loader:
+// Represents a single entire process of getting data from one place to another.
+// It takes in clients (RPC or DB) and conducts a designated process by using them.
+
+// ClientDatabaseLoader represents any process of loading data from a
+// Client to a Database
+type ClientDatabaseLoader interface {
 }
 
-// Approach 1: Loaders just implement functions related to loading a certain thing
-type IBlockHashLoader interface {
+// DatabaseLoader represents any process of loading data from one type of
+// Database to another.
+type DatabaseLoader interface {
 }
 
-type BlockHashLoader struct {
+// RPCCSVLoader represents the loading process for retrieving data from
+// a full node and saving it to disk as CSVs. Will implement
+// ClientDatabaseLoader.
+type RPCCSVLoader struct {
 }
 
-type IBlockLoader interface {
+// CSVNeo4jLoader represents the loading process for uploading CSV data
+// into Neo4j. Will implement DatabaseLoader.
+type CSVNeo4jLoader struct {
 }
 
-type BlockLoader struct {
-}
-
-type ITxLoader interface {
-}
-
-type TxLoader struct {
-}
-
-// Approach 2: Just write some functions that are needed and reorganize later
+// Just write some functions that are needed and reorganize later
 func BlockRangesToHashes(client client.Client, startBlockHeight, endBlockHeight int64) ([]*chainhash.Hash, error) {
 	hashes, err := client.GetBlockHashesByRange(startBlockHeight, endBlockHeight)
 	if err != nil {
@@ -54,13 +55,3 @@ func BlocksToTxs(blocks []*types.Block) ([]*types.Transaction, error) {
 	}
 	return txs, nil
 }
-
-func BlocksToDisk(db database.Database, blocks []*types.Block) {
-
-}
-
-func TxsToDisk(db database.Database, txs []*types.Transaction) {
-
-}
-
-// BlocksFromDiskToDB? TxsFromDiskToDB?
