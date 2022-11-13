@@ -23,7 +23,7 @@ type LoaderOptions map[string]interface{}
 // ClientDatabaseLoader represents any process of loading data from a
 // Client to a Database.
 type Loader interface {
-	Run(BlockRange, database.DBTx)
+	SendInput(BlockRange, database.DBTx)
 	Close()
 }
 
@@ -60,7 +60,6 @@ func (pipeline *ClientDBPipeline) Close() {
 }
 
 type LoaderMsg struct {
-	// t          LoaderMsgType
 	blockRange BlockRange
 	dbTx       *database.DBTx
 	data       interface{}
@@ -128,14 +127,12 @@ func (loader *ClientDBLoader) Close() error {
 	return loader.g.Wait()
 }
 
-func (loader *ClientDBLoader) Run(blockRange BlockRange, dbTx database.DBTx) {
+func (loader *ClientDBLoader) SendInput(blockRange BlockRange, dbTx database.DBTx) {
 	msg := LoaderMsg{
-		// Range,
 		blockRange,
 		&dbTx,
 		blockRange,
 	}
-	// loader.msgs <- msg
 	loader.pipeline.blockRangeCh <- msg
 }
 
