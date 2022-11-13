@@ -1,11 +1,9 @@
 package main
 
 import (
-	"fmt"
 	"log"
 
 	rpc "github.com/IlliniBlockchain/etl-bitcoin/client/rpc"
-	"github.com/IlliniBlockchain/etl-bitcoin/loader"
 	rpcclient "github.com/btcsuite/btcd/rpcclient"
 )
 
@@ -24,40 +22,34 @@ func main() {
 	// get blocks and txs
 	// write to disk
 
-	endBlockHeight := int64(25)
-	blockRangeInterval := int64(5)
-	currStart := int64(0)
-	for currStart <= endBlockHeight {
-		currEnd := Max(currStart+blockRangeInterval, endBlockHeight)
+	// endBlockHeight := int64(25)
+	// blockRangeInterval := int64(5)
+	// currStart := int64(0)
+	// for currStart <= endBlockHeight {
+	// 	currEnd := Max(currStart+blockRangeInterval, endBlockHeight)
 
-		// getting stuff from rpc
-		hashes, err := loader.BlockRangesToHashes(client, int64(currStart), int64(currEnd))
-		if err != nil {
-			log.Fatal(err)
-		}
-		blocks, err := loader.HashesToBlocks(client, hashes)
-		if err != nil {
-			log.Fatal(err)
-		}
+	// 	// getting stuff from rpc
+	// 	hashes, err := loader.BlockRangesToHashes(client, int64(currStart), int64(currEnd))
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
+	// 	blocks, err := loader.HashesToBlocks(client, hashes)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
 
-		// transforming/extracting data
-		txs, err := loader.BlocksToTxs(blocks)
-		if err != nil {
-			log.Fatal(err)
-		}
+	// 	// transforming/extracting data
+	// 	txs, err := loader.BlocksToTxs(blocks)
+	// 	if err != nil {
+	// 		log.Fatal(err)
+	// 	}
 
-		for _, tx := range txs {
-			fmt.Println(tx.Hash())
-		}
+	// 	for _, tx := range txs {
+	// 		fmt.Println(tx.Hash())
+	// 	}
 
-		// sending stuff to database
-		// fmt.Println("BLOCKS:")
-		// db.SaveBlocks(blocks)
-		// fmt.Println("TXS:")
-		// db.SaveTransactions(txs)
-
-		currStart += blockRangeInterval
-	}
+	// 	currStart += blockRangeInterval
+	// }
 }
 
 func setupBlocks(client rpcclient.Client) {

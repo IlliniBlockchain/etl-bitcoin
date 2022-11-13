@@ -1,12 +1,15 @@
 package loader
 
 import (
+	"context"
+	"fmt"
 	"sync"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"golang.org/x/sync/errgroup"
 )
 
 // General idea for loader:
@@ -30,7 +33,12 @@ type ClientDBLoader struct {
 	client   client.Client
 	db       database.Database
 	pipeline ClientDBPipeline
+
 	dbTxMu   sync.Mutex
+	ctx      context.Context
+	cancel   context.CancelFunc
+	stopOnce sync.Once
+	g        *errgroup.Group
 }
 
 type ClientDBPipeline struct {
@@ -40,6 +48,15 @@ type ClientDBPipeline struct {
 	blocksToTxsCh     chan LoaderMsg
 	blockHeadersCh    chan LoaderMsg
 	txsCh             chan LoaderMsg
+}
+
+func (pipeline *ClientDBPipeline) Close() {
+	close(pipeline.blockRangeCh)
+	close(pipeline.blockHashesCh)
+	close(pipeline.blocksToHeadersCh)
+	close(pipeline.blocksToTxsCh)
+	close(pipeline.blockHeadersCh)
+	close(pipeline.txsCh)
 }
 
 type LoaderMsg struct {
@@ -67,24 +84,48 @@ type BlockRange struct {
 	endBlockHeight   int64
 }
 
-func NewClientDBLoader(client client.Client, db database.Database, opts LoaderOptions, maxWorkers int) (*ClientDBLoader, error) {
+func NewClientDBLoader(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*ClientDBLoader, error) {
 	// initialize struct
 	pipeline := ClientDBPipeline{}
+	ctx, cancel := context.WithCancel(ctx)
+	g, ctx := errgroup.WithContext(ctx)
 	loader := &ClientDBLoader{
 		client:   client,
 		db:       db,
 		pipeline: pipeline,
+		ctx:      ctx,
+		cancel:   cancel,
+		g:        g,
 	}
 
 	// start a worker for each stage of pipeline
-	go loader.blockRangeHandler(loader.pipeline.blockRangeCh, loader.pipeline.blockHashesCh)
-	go loader.blockHashesHandler(loader.pipeline.blockHashesCh, loader.pipeline.blocksToHeadersCh, loader.pipeline.blocksToTxsCh)
-	go loader.blocksToHeadersHandler(loader.pipeline.blocksToHeadersCh, loader.pipeline.blockHeadersCh)
-	go loader.blocksToTxsHandler(loader.pipeline.blocksToTxsCh, loader.pipeline.txsCh)
-	go loader.headersHandler(loader.pipeline.blockHeadersCh)
-	go loader.txsHandler(loader.pipeline.txsCh)
+	g.Go(func() error {
+		return loader.blockRangeHandler(loader.pipeline.blockRangeCh, loader.pipeline.blockHashesCh)
+	})
+	g.Go(func() error {
+		return loader.blockHashesHandler(loader.pipeline.blockHashesCh, loader.pipeline.blocksToHeadersCh, loader.pipeline.blocksToTxsCh)
+	})
+	g.Go(func() error {
+		return loader.blocksToHeadersHandler(loader.pipeline.blocksToHeadersCh, loader.pipeline.blockHeadersCh)
+	})
+	g.Go(func() error { return loader.blocksToTxsHandler(loader.pipeline.blocksToTxsCh, loader.pipeline.txsCh) })
+	g.Go(func() error { return loader.headersHandler(loader.pipeline.blockHeadersCh) })
+	g.Go(func() error { return loader.txsHandler(loader.pipeline.txsCh) })
 
 	return loader, nil
+}
+
+func (loader *ClientDBLoader) Close() error {
+	done := false
+	loader.stopOnce.Do(func() {
+		loader.pipeline.Close()
+		loader.cancel()
+		done = true
+	})
+	if !done {
+		return fmt.Errorf("already closed")
+	}
+	return loader.g.Wait()
 }
 
 func (loader *ClientDBLoader) Run(blockRange BlockRange, dbTx database.DBTx) {
