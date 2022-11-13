@@ -1,6 +1,8 @@
 package loader
 
 import (
+	"sync"
+
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
@@ -28,6 +30,7 @@ type ClientDBLoader struct {
 	client   client.Client
 	db       database.Database
 	pipeline ClientDBPipeline
+	dbTxMu   sync.Mutex
 }
 
 type ClientDBPipeline struct {
@@ -155,7 +158,9 @@ func (loader *ClientDBLoader) headersHandler(src <-chan LoaderMsg) error {
 		txs := msg.data.([]*types.BlockHeader)
 		dbTx := *msg.dbTx
 		for _, header := range txs {
+			loader.dbTxMu.Lock()
 			err := dbTx.AddBlockHeader(header)
+			loader.dbTxMu.Unlock()
 			if err != nil {
 				return err
 			}
@@ -169,7 +174,9 @@ func (loader *ClientDBLoader) txsHandler(src <-chan LoaderMsg) error {
 		txs := msg.data.([]*types.Transaction)
 		dbTx := *msg.dbTx
 		for _, tx := range txs {
+			loader.dbTxMu.Lock()
 			err := dbTx.AddTransaction(tx)
+			loader.dbTxMu.Unlock()
 			if err != nil {
 				return err
 			}
