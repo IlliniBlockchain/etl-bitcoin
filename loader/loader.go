@@ -2,7 +2,6 @@ package loader
 
 import (
 	"fmt"
-	"sync"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
@@ -21,23 +20,37 @@ type LoaderOptions map[string]interface{}
 // ClientDatabaseLoader represents any process of loading data from a
 // Client to a Database.
 type Loader interface {
-	Run()
+	Run(BlockRange, database.DBTx)
+	Close()
 }
 
 type ClientDBLoaderConstructor func(client client.Client, db database.Database, opts LoaderOptions) (Loader, error)
 
 type ClientDBLoader struct {
-	client client.Client
-	db     database.Database
-
+	client     client.Client
+	db         database.Database
 	maxWorkers int
-	dbTxs      sync.Map
-	msgs       chan interface{}
-
-	// rangeChan chan BlockRange
-	// hashChan  chan []*chainhash.Hash
-	// blockChan chan []*types.Block
+	msgs       chan LoaderMsg
 }
+
+type LoaderMsg struct {
+	t          LoaderMsgType
+	blockRange BlockRange
+	dbTx       *database.DBTx
+	data       interface{}
+}
+
+type LoaderMsgType int
+
+const (
+	Range LoaderMsgType = iota
+	Hashes
+	Blocks
+	BlocksForHeaders
+	BlocksForTxs
+	Headers
+	Txs
+)
 
 type BlockRange struct {
 	startBlockHeight int64
@@ -45,8 +58,8 @@ type BlockRange struct {
 }
 
 func NewClientDBLoader(client client.Client, db database.Database, opts LoaderOptions, maxWorkers int) (*ClientDBLoader, error) {
-	// initialize channels
-	msgs := make(chan interface{})
+	// initialize struct
+	msgs := make(chan LoaderMsg)
 	loader := &ClientDBLoader{
 		client:     client,
 		db:         db,
@@ -63,60 +76,85 @@ func NewClientDBLoader(client client.Client, db database.Database, opts LoaderOp
 }
 
 func (loader *ClientDBLoader) Run(blockRange BlockRange, dbTx database.DBTx) {
-	// Associate blockRange with tx
-	loader.dbTxs.Store(blockRange, &dbTx)
-	// Send blockRange
-	loader.msgs <- blockRange
+	msg := LoaderMsg{
+		Range,
+		blockRange,
+		&dbTx,
+		blockRange,
+	}
+	loader.msgs <- msg
 }
 
 func (loader *ClientDBLoader) loaderWorker() error {
 	for msg := range loader.msgs {
-		// split this into individual functions to handle
-		switch msg := msg.(type) {
-		case BlockRange:
-			blockRange := msg
+		switch msg.t {
+		case Range:
+			blockRange := msg.data.(BlockRange)
 			hashes, err := BlockRangesToHashes(loader.client, blockRange.startBlockHeight, blockRange.endBlockHeight)
 			if err != nil {
 				return err
 			}
-			loader.msgs <- hashes
-		case []*chainhash.Hash:
-			hashes := msg
+			newMsg := LoaderMsg{Hashes, msg.blockRange, msg.dbTx, hashes}
+			loader.msgs <- newMsg
+
+		case Hashes:
+			hashes := msg.data.([]*chainhash.Hash)
 			blocks, err := HashesToBlocks(loader.client, hashes)
 			if err != nil {
 				return err
 			}
-			loader.msgs <- blocks
-		case []*types.Block:
-			blocks := msg
-			headers := make([]*types.BlockHeader, 0, len(blocks))
-			txs := make([]*types.Transaction, 0, len(blocks))
-			for _, block := range blocks {
-				headers = append(headers, &block.BlockHeader)
-				txs = append(txs, block.Transactions()...)
+
+			newHeadersMsg := LoaderMsg{BlocksForHeaders, msg.blockRange, msg.dbTx, blocks}
+			loader.msgs <- newHeadersMsg
+			newTxsMsg := LoaderMsg{BlocksForTxs, msg.blockRange, msg.dbTx, blocks}
+			loader.msgs <- newTxsMsg
+
+		case BlocksForHeaders:
+
+			blocks := msg.data.([]*types.Block)
+			headers, err := BlocksToHeaders(blocks)
+			if err != nil {
+				return err
 			}
-			loader.msgs <- headers
-			loader.msgs <- txs
-		case []*types.BlockHeader:
-			headers := msg
+			newMsg := LoaderMsg{
+				Headers,
+				msg.blockRange,
+				msg.dbTx,
+				headers,
+			}
+			loader.msgs <- newMsg
+
+		case BlocksForTxs:
+			blocks := msg.data.([]*types.Block)
+			txs, err := BlocksToTxs(blocks)
+			if err != nil {
+				return err
+			}
+
+			newMsg := LoaderMsg{Txs, msg.blockRange, msg.dbTx, txs}
+			loader.msgs <- newMsg
+
+		case Headers:
+			headers := msg.data.([]*types.BlockHeader)
 			dbTx := nil // will retrieve from somewhere
 			for _, header := range headers {
 				dbTx.AddBlockHeader(header)
 			}
-		case []*types.Transaction:
-			txs := msg
+
+		case Txs:
+			txs := msg.data.([]*types.Transaction)
 			dbTx := nil
 			for _, tx := range txs {
 				dbTx.AddTransaction(tx)
 			}
+
 		default:
-			return fmt.Errorf("unknown message type %T", msg)
+			return fmt.Errorf("Unknown LoaderMsgType %d", msg.t)
 		}
 	}
 	return nil
 }
 
-// Just write some functions that are needed and reorganize later
 func BlockRangesToHashes(client client.Client, startBlockHeight, endBlockHeight int64) ([]*chainhash.Hash, error) {
 	hashes, err := client.GetBlockHashesByRange(startBlockHeight, endBlockHeight)
 	if err != nil {
@@ -131,6 +169,14 @@ func HashesToBlocks(client client.Client, hashes []*chainhash.Hash) ([]*types.Bl
 		return nil, err
 	}
 	return blocks, nil
+}
+
+func BlocksToHeaders(blocks []*types.Block) ([]*types.BlockHeader, error) {
+	headers := make([]*types.BlockHeader, 0)
+	for _, block := range blocks {
+		headers = append(headers, &block.BlockHeader)
+	}
+	return headers, nil
 }
 
 func BlocksToTxs(blocks []*types.Block) ([]*types.Transaction, error) {
