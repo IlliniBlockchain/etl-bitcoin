@@ -40,6 +40,7 @@ type LoaderMsg struct {
 	data       interface{}
 }
 
+// Message type enum
 type LoaderMsgType int
 
 const (
@@ -90,7 +91,7 @@ func (loader *ClientDBLoader) loaderWorker() error {
 		switch msg.t {
 		case Range:
 			blockRange := msg.data.(BlockRange)
-			hashes, err := BlockRangesToHashes(loader.client, blockRange.startBlockHeight, blockRange.endBlockHeight)
+			hashes, err := loader.client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
 			if err != nil {
 				return err
 			}
@@ -99,29 +100,22 @@ func (loader *ClientDBLoader) loaderWorker() error {
 
 		case Hashes:
 			hashes := msg.data.([]*chainhash.Hash)
-			blocks, err := HashesToBlocks(loader.client, hashes)
+			blocks, err := loader.client.GetBlocks(hashes)
 			if err != nil {
 				return err
 			}
-
 			newHeadersMsg := LoaderMsg{BlocksForHeaders, msg.blockRange, msg.dbTx, blocks}
 			loader.msgs <- newHeadersMsg
 			newTxsMsg := LoaderMsg{BlocksForTxs, msg.blockRange, msg.dbTx, blocks}
 			loader.msgs <- newTxsMsg
 
 		case BlocksForHeaders:
-
 			blocks := msg.data.([]*types.Block)
 			headers, err := BlocksToHeaders(blocks)
 			if err != nil {
 				return err
 			}
-			newMsg := LoaderMsg{
-				Headers,
-				msg.blockRange,
-				msg.dbTx,
-				headers,
-			}
+			newMsg := LoaderMsg{Headers, msg.blockRange, msg.dbTx, headers}
 			loader.msgs <- newMsg
 
 		case BlocksForTxs:
@@ -130,7 +124,6 @@ func (loader *ClientDBLoader) loaderWorker() error {
 			if err != nil {
 				return err
 			}
-
 			newMsg := LoaderMsg{Txs, msg.blockRange, msg.dbTx, txs}
 			loader.msgs <- newMsg
 
@@ -153,22 +146,6 @@ func (loader *ClientDBLoader) loaderWorker() error {
 		}
 	}
 	return nil
-}
-
-func BlockRangesToHashes(client client.Client, startBlockHeight, endBlockHeight int64) ([]*chainhash.Hash, error) {
-	hashes, err := client.GetBlockHashesByRange(startBlockHeight, endBlockHeight)
-	if err != nil {
-		return nil, err
-	}
-	return hashes, nil
-}
-
-func HashesToBlocks(client client.Client, hashes []*chainhash.Hash) ([]*types.Block, error) {
-	blocks, err := client.GetBlocks(hashes)
-	if err != nil {
-		return nil, err
-	}
-	return blocks, nil
 }
 
 func BlocksToHeaders(blocks []*types.Block) ([]*types.BlockHeader, error) {
