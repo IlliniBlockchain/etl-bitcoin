@@ -22,14 +22,12 @@ type LoaderOptions map[string]interface{}
 
 // ClientDatabaseLoader represents any process of loading data from a
 // Client to a Database.
-type LoaderManager interface {
+type ILoaderManager interface {
 	SendInput(BlockRange, database.DBTx)
 	Close()
 }
 
-type ClientDBLoaderConstructor func(client client.Client, db database.Database, opts LoaderOptions) (LoaderManager, error)
-
-type ClientDBLoader struct {
+type LoaderManager struct {
 	client  client.Client
 	db      database.Database
 	inputCh chan *LoaderMsg[BlockRange]
@@ -51,12 +49,12 @@ type BlockRange struct {
 	endBlockHeight   int64
 }
 
-func NewClientDBLoader(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*ClientDBLoader, error) {
+func NewLoaderManager(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*LoaderManager, error) {
 	// initialize struct
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
 	inputCh := make(chan *LoaderMsg[BlockRange])
-	loader := &ClientDBLoader{
+	loader := &LoaderManager{
 		client:  client,
 		db:      db,
 		inputCh: inputCh,
@@ -76,7 +74,7 @@ func NewClientDBLoader(ctx context.Context, client client.Client, db database.Da
 	return loader, nil
 }
 
-func (loader *ClientDBLoader) Close() error {
+func (loader *LoaderManager) Close() error {
 	done := false
 	loader.stopOnce.Do(func() {
 		close(loader.inputCh)
@@ -89,7 +87,7 @@ func (loader *ClientDBLoader) Close() error {
 	return loader.g.Wait()
 }
 
-func (loader *ClientDBLoader) SendInput(blockRange BlockRange, dbTx database.DBTx) {
+func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx) {
 	msg := &LoaderMsg[BlockRange]{
 		blockRange,
 		&dbTx,
