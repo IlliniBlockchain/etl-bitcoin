@@ -22,7 +22,7 @@ type LoaderOptions map[string]interface{}
 
 // ClientDatabaseLoader represents any process of loading data from a
 // Client to a Database.
-type Loader interface {
+type LoaderManager interface {
 	SendInput(BlockRange, database.DBTx)
 	Close()
 }
@@ -33,6 +33,7 @@ type ClientDBLoader struct {
 	client   client.Client
 	db       database.Database
 	pipeline ClientDBPipeline
+	inputCh  chan *LoaderMsg[BlockRange]
 
 	dbTxMu   sync.Mutex
 	ctx      context.Context
@@ -59,10 +60,10 @@ func (pipeline *ClientDBPipeline) Close() {
 	close(pipeline.txsCh)
 }
 
-type LoaderMsg struct {
+type LoaderMsg[T any] struct {
 	blockRange BlockRange
 	dbTx       *database.DBTx
-	data       interface{}
+	data       T
 }
 
 // Message type enum
@@ -88,28 +89,35 @@ func NewClientDBLoader(ctx context.Context, client client.Client, db database.Da
 	pipeline := ClientDBPipeline{}
 	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
+	inputCh := make(chan *LoaderMsg[BlockRange])
 	loader := &ClientDBLoader{
 		client:   client,
 		db:       db,
 		pipeline: pipeline,
+		inputCh:  inputCh,
 		ctx:      ctx,
 		cancel:   cancel,
 		g:        g,
 	}
 
+	// loaders
+	blockRangeLoader := NewLoader[BlockRange, []*chainhash.Hash](client, inputCh, blockRangeHandler)
+	g.Go(blockRangeLoader.Run)
+	// blockHashLoader := NewLoader[[]*chainhash.Hash, []*types.Block](client, blockRangeLoader.Dst(), blockHashHandler)
+
 	// start a worker for each stage of pipeline
-	g.Go(func() error {
-		return loader.blockRangeHandler(loader.pipeline.blockRangeCh, loader.pipeline.blockHashesCh)
-	})
-	g.Go(func() error {
-		return loader.blockHashesHandler(loader.pipeline.blockHashesCh, loader.pipeline.blocksToHeadersCh, loader.pipeline.blocksToTxsCh)
-	})
-	g.Go(func() error {
-		return loader.blocksToHeadersHandler(loader.pipeline.blocksToHeadersCh, loader.pipeline.blockHeadersCh)
-	})
-	g.Go(func() error { return loader.blocksToTxsHandler(loader.pipeline.blocksToTxsCh, loader.pipeline.txsCh) })
-	g.Go(func() error { return loader.headersHandler(loader.pipeline.blockHeadersCh) })
-	g.Go(func() error { return loader.txsHandler(loader.pipeline.txsCh) })
+	// g.Go(func() error {
+	// 	return loader.blockRangeHandler(loader.pipeline.blockRangeCh, loader.pipeline.blockHashesCh)
+	// })
+	// g.Go(func() error {
+	// 	return loader.blockHashesHandler(loader.pipeline.blockHashesCh, loader.pipeline.blocksToHeadersCh, loader.pipeline.blocksToTxsCh)
+	// })
+	// g.Go(func() error {
+	// 	return loader.blocksToHeadersHandler(loader.pipeline.blocksToHeadersCh, loader.pipeline.blockHeadersCh)
+	// })
+	// g.Go(func() error { return loader.blocksToTxsHandler(loader.pipeline.blocksToTxsCh, loader.pipeline.txsCh) })
+	// g.Go(func() error { return loader.headersHandler(loader.pipeline.blockHeadersCh) })
+	// g.Go(func() error { return loader.txsHandler(loader.pipeline.txsCh) })
 
 	return loader, nil
 }
@@ -117,7 +125,7 @@ func NewClientDBLoader(ctx context.Context, client client.Client, db database.Da
 func (loader *ClientDBLoader) Close() error {
 	done := false
 	loader.stopOnce.Do(func() {
-		loader.pipeline.Close()
+		close(loader.inputCh)
 		loader.cancel()
 		done = true
 	})
@@ -136,18 +144,68 @@ func (loader *ClientDBLoader) SendInput(blockRange BlockRange, dbTx database.DBT
 	loader.pipeline.blockRangeCh <- msg
 }
 
-func (loader *ClientDBLoader) blockRangeHandler(src <-chan LoaderMsg, dst chan<- LoaderMsg) error {
-	for msg := range src {
-		blockRange := msg.data.(BlockRange)
-		hashes, err := loader.client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
+type ILoader interface {
+	Run() error
+}
+type Loader[S, D any] struct {
+	client client.Client
+	src    <-chan *LoaderMsg[S]
+	dst    chan *LoaderMsg[D]
+	f      LoaderFunc[S, D]
+}
+
+func (loader *Loader[S, D]) Dst() <-chan *LoaderMsg[D] {
+	return loader.dst
+}
+
+func NewLoader[S, D any](client client.Client, src <-chan *LoaderMsg[S], f LoaderFunc[S, D]) *Loader[S, D] {
+	// create dst
+	dst := make(chan *LoaderMsg[D])
+	loader := &Loader[S, D]{
+		client,
+		src,
+		dst,
+		f,
+	}
+	return loader
+}
+
+func (loader *Loader[S, D]) Run() error {
+	for msg := range loader.src {
+		output, err := loader.f(loader.client, msg)
 		if err != nil {
 			return err
 		}
-		newMsg := LoaderMsg{msg.blockRange, msg.dbTx, hashes}
-		dst <- newMsg
+		loader.dst <- output
 	}
+	close(loader.dst)
 	return nil
 }
+
+type LoaderFunc[S, D any] func(client.Client, *LoaderMsg[S]) (*LoaderMsg[D], error)
+
+func blockRangeHandler(client client.Client, src *LoaderMsg[BlockRange]) (*LoaderMsg[[]*chainhash.Hash], error) {
+	blockRange := src.data
+	hashes, err := client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
+	if err != nil {
+		return nil, err
+	}
+	newMsg := &LoaderMsg[[]*chainhash.Hash]{src.blockRange, src.dbTx, hashes}
+	return newMsg, nil
+}
+
+// func (loader *ClientDBLoader) blockRangeHandler(src <-chan LoaderMsg, dst chan<- LoaderMsg) error {
+// 	for msg := range src {
+// 		blockRange := msg.data.(BlockRange)
+// 		hashes, err := loader.client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
+// 		if err != nil {
+// 			return err
+// 		}
+// 		newMsg := LoaderMsg{msg.blockRange, msg.dbTx, hashes}
+// 		dst <- newMsg
+// 	}
+// 	return nil
+// }
 
 func (loader *ClientDBLoader) blockHashesHandler(src <-chan LoaderMsg, headerDst chan<- LoaderMsg, txDst chan<- LoaderMsg) error {
 	for msg := range src {
