@@ -12,9 +12,6 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// LoaderOptions represents a map of arbitrary options when constructing a LoaderManager.
-type LoaderOptions map[string]interface{}
-
 // ILoaderManager outlines an interface for a loader manager.
 type ILoaderManager interface {
 	SendInput(BlockRange, database.DBTx)
@@ -40,6 +37,9 @@ type LoaderMsg[T any] struct {
 	dbTx       *database.DBTx
 	data       T
 }
+
+// LoaderOptions represents a map of arbitrary options when constructing a LoaderManager.
+type LoaderOptions map[string]interface{}
 
 type BlockRange struct {
 	startBlockHeight int64
