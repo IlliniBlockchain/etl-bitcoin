@@ -12,21 +12,17 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// General idea for loader:
-// Represents a single entire process of getting data from a source to a destination.
-// It takes in clients (RPC or DB) and implements the loading process for transporting
-// data between them.
-
-// LoaderOptions represents a map of arbitrary options when constructing a loader.
+// LoaderOptions represents a map of arbitrary options when constructing a LoaderManager.
 type LoaderOptions map[string]interface{}
 
-// ClientDatabaseLoader represents any process of loading data from a
-// Client to a Database.
+// ILoaderManager outlines an interface for a loader manager.
 type ILoaderManager interface {
 	SendInput(BlockRange, database.DBTx)
 	Close()
 }
 
+// LoaderManager stores state for managing loaders for loading data from a `Client` to
+// a `Database`.
 type LoaderManager struct {
 	client  client.Client
 	db      database.Database
@@ -38,6 +34,7 @@ type LoaderManager struct {
 	g        *errgroup.Group
 }
 
+// LoaderMsg stores state for data being passed through loaders.
 type LoaderMsg[T any] struct {
 	blockRange BlockRange
 	dbTx       *database.DBTx
@@ -49,6 +46,7 @@ type BlockRange struct {
 	endBlockHeight   int64
 }
 
+// NewLoaderManager creates a new LoaderManager and initiates goroutines for the loaders in a pipeline.
 func NewLoaderManager(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*LoaderManager, error) {
 	// initialize struct
 	ctx, cancel := context.WithCancel(ctx)
@@ -74,6 +72,7 @@ func NewLoaderManager(ctx context.Context, client client.Client, db database.Dat
 	return loader, nil
 }
 
+// Close gracefully shuts down all loader processes.
 func (loader *LoaderManager) Close() error {
 	done := false
 	loader.stopOnce.Do(func() {
@@ -87,6 +86,7 @@ func (loader *LoaderManager) Close() error {
 	return loader.g.Wait()
 }
 
+// SendInput starts the given parameters on the first stage of the loader pipeline.
 func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx) {
 	msg := &LoaderMsg[BlockRange]{
 		blockRange,
@@ -96,9 +96,15 @@ func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx
 	loader.inputCh <- msg
 }
 
+// ILoader is a simple interface for loaders.
 type ILoader interface {
 	Run() error
 }
+
+// Loader is the go to loader for an inidividual stage in the pipeline
+// extracting data from an RPC client to a database. It stores state and
+// uses the function f to transform data coming from a src channel to send
+// to a dst channel.
 type Loader[S, D any] struct {
 	client client.Client
 	src    <-chan *LoaderMsg[S]
@@ -123,6 +129,10 @@ func NewLoader[S, D any](client client.Client, src <-chan *LoaderMsg[S], f Loade
 	return loader
 }
 
+// Run listens for messages sent to the loader's src channel,
+// transforms the data and sends it to the next loader.
+// Importantly, when it's src channel is closed, it closes its
+// dst channel, which causes a domino effect of closing loader channels.
 func (loader *Loader[S, D]) Run() error {
 	for msg := range loader.src {
 		output, err := loader.f(loader.client, msg)
@@ -135,6 +145,7 @@ func (loader *Loader[S, D]) Run() error {
 	return nil
 }
 
+// LoaderSink represents the last stage in a loader pipeline.
 type LoaderSink[S any] struct {
 	src <-chan *LoaderMsg[S]
 	f   LoaderSinkFunc[S]
@@ -160,7 +171,8 @@ func (loader *LoaderSink[S]) Run() error {
 	return nil
 }
 
-// Loader handlers
+// blockRangeHandler is a LoaderFunc that uses a block range to
+// retrieve a list of block hashes.
 func blockRangeHandler(client client.Client, msg *LoaderMsg[BlockRange]) (*LoaderMsg[[]*chainhash.Hash], error) {
 	blockRange := msg.data
 	hashes, err := client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
@@ -171,6 +183,8 @@ func blockRangeHandler(client client.Client, msg *LoaderMsg[BlockRange]) (*Loade
 	return newMsg, nil
 }
 
+// blockHashHandler is a LoaderFunc that uses a list of block
+// hashes to retrieve block header and transaction data.
 func blockHashHandler(client client.Client, msg *LoaderMsg[[]*chainhash.Hash]) (*LoaderMsg[[]*types.Block], error) {
 	hashes := msg.data
 	blocks, err := client.GetBlocks(hashes)
@@ -181,7 +195,8 @@ func blockHashHandler(client client.Client, msg *LoaderMsg[[]*chainhash.Hash]) (
 	return newMsg, nil
 }
 
-// LoaderSink handlers
+// blockHandler is a LoaderSinkFunc that fills a database transaction with
+// block headers and transactions.
 func blockHandler(dbTx database.DBTx, msg *LoaderMsg[[]*types.Block]) error {
 	blocks := msg.data
 	for _, block := range blocks {
