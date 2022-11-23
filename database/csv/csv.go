@@ -55,12 +55,13 @@ func (db *CSVDatabase) Close() error {
 	done := false
 	db.stopOnce.Do(func() {
 		close(db.msgs)
-		db.cancel()
-		done = true
+		db.csv_files.Range(func(key, value interface{}) bool {
+			csvFile := value.(*csvFile)
+			// TODO: handle error
+			csvFile.close()
+			return true
+		})
 	})
-	if !done {
-		return fmt.Errorf("already closed")
-	}
 	return db.g.Wait()
 }
 
