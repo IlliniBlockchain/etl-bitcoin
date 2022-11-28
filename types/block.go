@@ -105,12 +105,12 @@ func (bh *BlockHeader) String() string {
 // WithTransactions returns a Block with the given transactions.
 func (bh *BlockHeader) WithTransactions(txs []btcjson.TxRawResult) (*Block, error) {
 	block := &Block{
-		*bh,
+		bh,
 		make([]*Transaction, len(txs)),
 	}
 	var err error
 	for i, tx := range txs {
-		block.txs[i], err = NewTransactionWithBlock(tx, block)
+		block.txs[i], err = NewTransaction(tx).WithBlockAndIndex(block, i)
 		if err != nil {
 			return nil, err
 		}
@@ -120,14 +120,14 @@ func (bh *BlockHeader) WithTransactions(txs []btcjson.TxRawResult) (*Block, erro
 
 // Block represents a block header with its transactions.
 type Block struct {
-	BlockHeader
+	*BlockHeader
 	txs []*Transaction
 }
 
 // NewBlock returns a new instance of a block from a raw json block with verbosity = 2.
 func NewBlock(blockVerbose btcjson.GetBlockVerboseTxResult) *Block {
 	block := &Block{
-		*NewBlockHeaderFromVerboseTx(blockVerbose),
+		NewBlockHeaderFromVerboseTx(blockVerbose),
 		make([]*Transaction, len(blockVerbose.Tx)),
 	}
 	for i, tx := range blockVerbose.Tx {
@@ -135,7 +135,8 @@ func NewBlock(blockVerbose btcjson.GetBlockVerboseTxResult) *Block {
 		tx.Blocktime = block.Time()
 		tx.Time = block.Time()
 		tx.Confirmations = uint64(block.Confirmations())
-		block.txs[i], _ = NewTransactionWithBlock(tx, block)
+		block.txs[i] = NewTransaction(tx)
+		block.txs[i], _ = block.txs[i].WithBlockAndIndex(block, i)
 	}
 	return block
 }

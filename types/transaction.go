@@ -12,6 +12,7 @@ import (
 type Transaction struct {
 	data  btcjson.TxRawResult
 	block *Block
+	index int
 	vin   []*Vin
 	vout  []*Vout
 }
@@ -36,14 +37,28 @@ func NewTransaction(data btcjson.TxRawResult) *Transaction {
 
 // WithBlock stores a reference to the block that contains the transaction.
 func (tx *Transaction) WithBlock(block *Block) (*Transaction, error) {
+	for i, btx := range block.txs {
+		if btx.data.Txid == tx.data.Txid {
+			return tx.WithBlockAndIndex(block, i)
+		}
+	}
+	return nil, fmt.Errorf("tx not found in block")
+}
+
+// WithBlockAndIndex stores a reference to the block that contains the transaction
+// and the index of the transaction in the block.
+func (tx *Transaction) WithBlockAndIndex(block *Block, index int) (*Transaction, error) {
 	if block == nil {
 		return nil, fmt.Errorf("block is nil")
 	}
 	if tx.BlockHash() != block.Hash() {
 		return nil, fmt.Errorf("block hash mismatch: %s != %s", tx.BlockHash(), block.Hash())
 	}
-	cpy := *block
-	tx.block = &cpy
+	if block.txs[index].data.Txid != tx.data.Txid {
+		return nil, fmt.Errorf("tx index mismatch: %s != %s", tx, block.txs[index])
+	}
+	tx.block = block
+	tx.index = index
 	return tx, nil
 }
 
@@ -55,6 +70,9 @@ func (tx *Transaction) TxID() string { return tx.data.Txid }
 
 // Hash returns the transaction hash (differs from txid for witness transactions).
 func (tx *Transaction) Hash() string { return tx.data.Hash }
+
+// Index returns the index of the transaction in the block.
+func (tx *Transaction) Index() int { return tx.index }
 
 // Size returns the transaction size in bytes.
 func (tx *Transaction) Size() int32 { return tx.data.Size }
