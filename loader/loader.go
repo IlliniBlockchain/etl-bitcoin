@@ -2,7 +2,6 @@ package loader
 
 import (
 	"context"
-	"fmt"
 	"sync"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
@@ -26,7 +25,6 @@ type LoaderManager struct {
 	inputCh chan *LoaderMsg[BlockRange]
 
 	ctx      context.Context
-	cancel   context.CancelFunc
 	stopOnce sync.Once
 	g        *errgroup.Group
 }
@@ -49,7 +47,6 @@ type BlockRange struct {
 // NewLoaderManager creates a new LoaderManager and initiates goroutines for the loaders in a pipeline.
 func NewLoaderManager(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*LoaderManager, error) {
 	// initialize struct
-	ctx, cancel := context.WithCancel(ctx)
 	g, ctx := errgroup.WithContext(ctx)
 	inputCh := make(chan *LoaderMsg[BlockRange])
 	loader := &LoaderManager{
@@ -57,7 +54,6 @@ func NewLoaderManager(ctx context.Context, client client.Client, db database.Dat
 		db:      db,
 		inputCh: inputCh,
 		ctx:     ctx,
-		cancel:  cancel,
 		g:       g,
 	}
 
@@ -74,15 +70,9 @@ func NewLoaderManager(ctx context.Context, client client.Client, db database.Dat
 
 // Close gracefully shuts down all loader processes.
 func (loader *LoaderManager) Close() error {
-	done := false
 	loader.stopOnce.Do(func() {
 		close(loader.inputCh)
-		loader.cancel()
-		done = true
 	})
-	if !done {
-		return fmt.Errorf("already closed")
-	}
 	return loader.g.Wait()
 }
 
