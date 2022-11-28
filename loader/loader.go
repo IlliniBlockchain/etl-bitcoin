@@ -134,6 +134,11 @@ func NewLoader[S, D any](client client.Client, src <-chan *LoaderMsg[S], f Loade
 // Importantly, when it's src channel is closed, it closes its
 // dst channel, which causes a domino effect of closing loader channels.
 func (loader *Loader[S, D]) Run() error {
+	// Close dst to signal to downstream loaders that there is
+	// no more data whenever execution stops.
+	defer close(loader.dst)
+
+	// Listen for messages from upstream loaders.
 	for msg := range loader.src {
 		output, err := loader.f(loader.client, msg)
 		if err != nil {
@@ -141,7 +146,6 @@ func (loader *Loader[S, D]) Run() error {
 		}
 		loader.dst <- output
 	}
-	close(loader.dst)
 	return nil
 }
 
