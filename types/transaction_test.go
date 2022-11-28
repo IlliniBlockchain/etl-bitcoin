@@ -31,13 +31,27 @@ func (s *TransactionTestSuite) TestTransactionData() {
 	s.Equal(s.tx.Weight, tx.Weight())
 	s.Equal(s.tx.Version, tx.Version())
 	s.Equal(s.tx.LockTime, tx.LockTime())
-	s.Equal(s.tx.Vin, tx.Vin())
-	s.Equal(s.tx.Vout, tx.Vout())
 	s.Equal(s.tx.BlockHash, tx.BlockHash())
 	s.Equal(s.tx.Confirmations, tx.Confirmations())
 	s.Equal(s.tx.Time, tx.Time())
 	s.Equal(s.tx.Blocktime, tx.BlockTime())
 	s.Nil(tx.Block())
+	s.Len(tx.Vin(), len(s.tx.Vin))
+	for i, vin := range s.tx.Vin {
+		s.Equal(vin.Coinbase, tx.Vin()[i].Coinbase())
+		s.Equal(vin.Sequence, tx.Vin()[i].Sequence())
+		s.Equal(vin.Txid, tx.Vin()[i].TxID())
+		s.Equal(vin.Vout, tx.Vin()[i].Vout())
+		s.Equal(vin.ScriptSig, tx.Vin()[i].ScriptSig())
+		s.Equal(vin.Witness, tx.Vin()[i].Witness())
+		s.Equal(vin.IsCoinBase(), tx.Vin()[i].IsCoinbase())
+	}
+	s.Len(tx.Vout(), len(s.tx.Vout))
+	for i, vout := range s.tx.Vout {
+		s.Equal(vout.Value, tx.Vout()[i].Value())
+		s.Equal(vout.N, tx.Vout()[i].N())
+		s.Equal(vout.ScriptPubKey, tx.Vout()[i].ScriptPubKey())
+	}
 }
 
 func (s *TransactionTestSuite) TestTransactionWithBlock() {
