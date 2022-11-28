@@ -16,3 +16,6 @@
 
 # RPC Credentials
 .env
+
+# MacOS
+.DS_Store
