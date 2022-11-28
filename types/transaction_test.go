@@ -1,8 +1,6 @@
 package types
 
 import (
-	"encoding/json"
-	"os"
 	"testing"
 
 	"github.com/btcsuite/btcd/btcjson"
@@ -15,10 +13,7 @@ type TransactionTestSuite struct {
 }
 
 func (s *TransactionTestSuite) SetupTest() {
-	// Read the raw transaction from file.
-	data, err := os.ReadFile("testdata/transaction.json")
-	s.NoError(err, "failed to read transaction test data")
-	s.NoError(json.Unmarshal(data, &s.tx), "failed to parse transaction test data")
+	s.NoError(parseTestData("testdata/transaction.json", &s.tx))
 }
 
 func (s *TransactionTestSuite) TestTransactionData() {
@@ -56,27 +51,18 @@ func (s *TransactionTestSuite) TestTransactionData() {
 
 func (s *TransactionTestSuite) TestTransactionWithBlock() {
 	/// Block 409008 contains the transaction.
-	blk := &Block{
-		BlockHeader: BlockHeader{
-			data: btcjson.GetBlockVerboseResult{
-				Hash: "0000000000000000042450ad2be4f2b6439ed39f70716a7575440d462cf165d9",
-			},
-		},
-	}
-	tx, err := NewTransactionWithBlock(s.tx, blk)
+	var blockData btcjson.GetBlockVerboseTxResult
+	s.NoError(parseTestData("testdata/block_409008.json", &blockData))
+	blk := NewBlock(blockData)
+	tx, err := NewTransaction(s.tx).WithBlock(blk)
 	s.NoError(err, "failed to create transaction with block")
 	s.Equal(*blk, *tx.Block(), "block should be unchanged")
 	s.NotSame(blk, tx.Block(), "block should be a copy")
 
 	/// Block 1000 does not contain the transaction.
-	blk = &Block{
-		BlockHeader: BlockHeader{
-			data: btcjson.GetBlockVerboseResult{
-				Hash: "00000000c937983704a73af28acdec37b049d214adbda81d7e2a3dd146f6ed09",
-			},
-		},
-	}
-	tx, err = NewTransactionWithBlock(s.tx, blk)
+	s.NoError(parseTestData("testdata/block_1000.json", &blockData))
+	blk = NewBlock(blockData)
+	tx, err = NewTransaction(s.tx).WithBlock(blk)
 	s.Error(err, "block does not contain transaction")
 	s.Nil(tx, "tx should be nil")
 }
