@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // Database represents a database connection.
 type Database interface {
-	// LastBlockhash returns the blockhash of the last block committed to the database.
-	LastBlockhash() (*chainhash.Hash, error)
+	// LastBlockNumber returns the block height of the last block committed to the database.
+	LastBlockNumber() (int64, error)
 	// NewDBTx returns a new DBTx.
 	NewDBTx() (DBTx, error)
 	// Close closes the database connection. Only callable once.
