@@ -3,7 +3,6 @@ package csv
 import (
 	"context"
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strconv"
 	"strings"
@@ -161,11 +160,11 @@ func (s *CSVDatabaseTestSuite) TestInsert() {
 				s.Error(err)
 			} else {
 				s.NoError(err)
-				haveFile, _ := s.filePaths[tt.args.table]
-				wantFile, _ := s.filePaths[strings.ReplaceAll(tt.args.table, "_test", "")]
-				haveFileBytes, err := ioutil.ReadFile(haveFile)
+				haveFile := s.filePaths[tt.args.table]
+				wantFile := s.filePaths[strings.ReplaceAll(tt.args.table, "_test", "")]
+				haveFileBytes, err := os.ReadFile(haveFile)
 				s.NoError(err)
-				wantFileBytes, err := ioutil.ReadFile(wantFile)
+				wantFileBytes, err := os.ReadFile(wantFile)
 				s.NoError(err)
 				s.Equal(string(wantFileBytes), string(haveFileBytes))
 			}
@@ -265,6 +264,59 @@ func TestCSVDatabaseTestSuite(t *testing.T) {
 	suite.Run(t, new(CSVDatabaseTestSuite))
 }
 
+func TestGetRowField(t *testing.T) {
+	type args struct {
+		headers []string
+		row     []string
+		key     string
+	}
+	tests := []struct {
+		name    string
+		args    args
+		want    string
+		wantErr bool
+	}{
+		{
+			name: "first_field",
+			args: args{
+				headers: testRow1.Headers(),
+				row:     testRow1.Row(),
+				key:     "header1",
+			},
+			want: "1",
+		},
+		{
+			name: "second_field",
+			args: args{
+				headers: testRow1.Headers(),
+				row:     testRow1.Row(),
+				key:     "header2",
+			},
+			want: "test1",
+		},
+		{
+			name: "field_not_found",
+			args: args{
+				headers: testRow1.Headers(),
+				row:     testRow1.Row(),
+				key:     "header3",
+			},
+			wantErr: true,
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got, err := GetRowField(tt.args.headers, tt.args.row, tt.args.key)
+			if tt.wantErr {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.want, got)
+			}
+		})
+	}
+}
+
 func BenchmarkCSVDatabaseSequentialRead(b *testing.B) {
 	bmFilePath := fmt.Sprintf("./testdata/%s%d.csv", b.Name(), b.N)
 	db, err := NewCSVDatabase(context.Background(), map[string]string{"bm": bmFilePath}, 1)
@@ -276,7 +328,7 @@ func BenchmarkCSVDatabaseSequentialRead(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		records[i] = &testRow{
 			i + 1,
-			fmt.Sprintf("test%d", i+1),
+			"test%d" + strconv.Itoa(i+1),
 		}
 		msgs[i] = NewCSVReadMsg("bm", i+1, 1)
 	}

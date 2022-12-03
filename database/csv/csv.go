@@ -14,6 +14,16 @@ type CSVRecord interface {
 	Row() []string
 }
 
+// GetRowField returns the value of a field in a row.
+func GetRowField(headers []string, row []string, key string) (string, error) {
+	for i, header := range headers {
+		if header == key {
+			return row[i], nil
+		}
+	}
+	return "", fmt.Errorf("key not found")
+}
+
 // CSVDatabase is a base implementation of a database stored across CSV files.
 type CSVDatabase struct {
 	csv_files  sync.Map
