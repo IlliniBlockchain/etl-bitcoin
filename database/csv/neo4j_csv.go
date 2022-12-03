@@ -7,7 +7,6 @@ import (
 
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 var (
@@ -47,11 +46,26 @@ func NewNeo4jCSVDatabase(ctx context.Context, opts database.DBOptions) (database
 	return &Neo4jCSVDatabase{csvDB}, nil
 }
 
-// LastBlockHash returns the hash of the last block in the database.
+// LastBlockNumber returns the height of the last block in the database.
 //
 // Implements database.Database.
-func (db *Neo4jCSVDatabase) LastBlockhash() (*chainhash.Hash, error) {
-	return nil, nil
+func (db *Neo4jCSVDatabase) LastBlockNumber() (int64, error) {
+	lastBlockRead := NewCSVReadMsg(blockKey, -1, 1)
+	if err := db.SendMsg(lastBlockRead); err != nil {
+		return 0, err
+	}
+	if len(lastBlockRead.Records) == 0 {
+		return 0, nil
+	}
+	blockHeightStr, err := GetRowField(csvBlockHeader{}.Headers(), lastBlockRead.Records[0], "height:int")
+	if err != nil {
+		return 0, err
+	}
+	blockHeight, err := strconv.ParseInt(blockHeightStr, 10, 64)
+	if err != nil {
+		return 0, err
+	}
+	return blockHeight, nil
 }
 
 // NewDBTx creates a new database transaction.
