@@ -16,6 +16,9 @@ type CSVRecord interface {
 
 // GetRowField returns the value of a field in a row.
 func GetRowField(headers []string, row []string, key string) (string, error) {
+	if len(headers) != len(row) {
+		return "", fmt.Errorf("headers and row have different lengths")
+	}
 	for i, header := range headers {
 		if header == key {
 			return row[i], nil
