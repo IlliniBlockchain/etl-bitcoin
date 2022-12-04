@@ -63,7 +63,7 @@ func (s *LoaderTestSuite) SetupTest() {
 func (s *LoaderTestSuite) TestBlockRangeHandler() {
 	type args struct {
 		client client.Client
-		msg    *LoaderMsg[BlockRange]
+		data   BlockRange
 	}
 
 	hashes := getTestBlockHashes(s.mockClient)
@@ -71,49 +71,29 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 	tests := []struct {
 		name    string
 		args    args
-		want    *LoaderMsg[[]*chainhash.Hash]
+		want    []*chainhash.Hash
 		wantErr bool
 	}{
 		{
 			name: "Test blockRangeHandler with full range",
 			args: args{
 				client: s.mockClient,
-				msg: &LoaderMsg[BlockRange]{
-					blockRange: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber,
-					},
-					dbTx: nil,
-					data: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber,
-					},
-				},
-			},
-			want: &LoaderMsg[[]*chainhash.Hash]{
-				blockRange: BlockRange{
+				data: BlockRange{
 					Start: MinBlockNumber,
 					End:   MaxBlockNumber,
 				},
-				dbTx: nil,
-				data: hashes,
 			},
+			want:    hashes,
 			wantErr: false,
 		},
 		{
 			name: "Test blockRangeHandler with invalid block range",
 			args: args{
 				client: s.mockClient,
-				msg: &LoaderMsg[BlockRange]{
-					blockRange: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber + 1,
-					},
-					dbTx: nil,
-					data: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber + 1,
-					},
+
+				data: BlockRange{
+					Start: MinBlockNumber,
+					End:   MaxBlockNumber + 1,
 				},
 			},
 			want:    nil,
@@ -123,7 +103,7 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := blockRangeHandler(tt.args.client, tt.args.msg)
+			got, err := blockRangeHandler(tt.args.client, tt.args.data)
 
 			if tt.wantErr {
 				assert.Error(s.T(), err)
@@ -139,7 +119,7 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 func (s *LoaderTestSuite) TestBlockHashHandler() {
 	type args struct {
 		client client.Client
-		msg    *LoaderMsg[[]*chainhash.Hash]
+		data   []*chainhash.Hash
 	}
 
 	hashes := getTestBlockHashes(s.mockClient)
@@ -154,44 +134,24 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 	tests := []struct {
 		name    string
 		args    args
-		want    *LoaderMsg[[]*types.Block]
+		want    []*types.Block
 		wantErr bool
 	}{
 		{
 			name: "Test blockHashHandler with full range",
 			args: args{
 				client: s.mockClient,
-				msg: &LoaderMsg[[]*chainhash.Hash]{
-					blockRange: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber,
-					},
-					dbTx: nil,
-					data: hashes,
-				},
+				data:   hashes,
 			},
-			want: &LoaderMsg[[]*types.Block]{
-				blockRange: BlockRange{
-					Start: MinBlockNumber,
-					End:   MaxBlockNumber,
-				},
-				dbTx: nil,
-				data: blocks,
-			},
+			want:    blocks,
 			wantErr: false,
 		},
 		{
 			name: "Test blockHashHandler with invalid hash",
 			args: args{
 				client: s.mockClient,
-				msg: &LoaderMsg[[]*chainhash.Hash]{
-					blockRange: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber,
-					},
-					dbTx: nil,
-					data: []*chainhash.Hash{invalidHash},
-				},
+
+				data: []*chainhash.Hash{invalidHash},
 			},
 			want:    nil,
 			wantErr: true,
@@ -200,7 +160,7 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			got, err := blockHashHandler(tt.args.client, tt.args.msg)
+			got, err := blockHashHandler(tt.args.client, tt.args.data)
 
 			if tt.wantErr {
 				assert.Error(s.T(), err)
@@ -216,7 +176,7 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 func (s *LoaderTestSuite) TestBlockHandler() {
 	type args struct {
 		dbTx *MockDBTx
-		msg  *LoaderMsg[[]*types.Block]
+		data []*types.Block
 	}
 
 	dbtx_full := s.mockDatabase.NewMockDBTx()
@@ -231,14 +191,7 @@ func (s *LoaderTestSuite) TestBlockHandler() {
 			name: "Test blockHandler with full blocks",
 			args: args{
 				dbTx: dbtx_full,
-				msg: &LoaderMsg[[]*types.Block]{
-					blockRange: BlockRange{
-						Start: MinBlockNumber,
-						End:   MaxBlockNumber,
-					},
-					dbTx: dbtx_full,
-					data: blocks,
-				},
+				data: blocks,
 			},
 			wantErr: false,
 		},
@@ -246,7 +199,7 @@ func (s *LoaderTestSuite) TestBlockHandler() {
 
 	for _, tt := range tests {
 		s.Run(tt.name, func() {
-			err := blockHandler(tt.args.dbTx, tt.args.msg)
+			err := blockHandler(tt.args.dbTx, tt.args.data)
 			if tt.wantErr {
 				assert.Error(s.T(), err)
 				return
@@ -255,7 +208,7 @@ func (s *LoaderTestSuite) TestBlockHandler() {
 
 			correctHeaders := make([]*types.BlockHeader, len(blocks))
 			correctTxs := make([]*types.Transaction, 0)
-			for i, block := range tt.args.msg.data {
+			for i, block := range tt.args.data {
 				correctHeaders[i] = block.BlockHeader
 				correctTxs = append(correctTxs, block.Transactions()...)
 			}
@@ -282,7 +235,7 @@ func (s *LoaderTestSuite) TestLoaderManager() {
 		Start: MinBlockNumber,
 		End:   MaxBlockNumber,
 	}
-	loaderManager.SendInput(blockRange, dbTx)
+	loaderManager.SendInput(blockRange)
 
 	// wait for the loader manager to finish
 	loaderManager.Close()
