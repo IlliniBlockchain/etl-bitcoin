@@ -16,104 +16,30 @@ import (
 	"github.com/stretchr/testify/suite"
 )
 
-type LoaderTestSuite struct {
-	suite.Suite
-	mockClient *MockClient
-}
-
-// mock client
-type MockClient struct {
-	blocks         []*types.Block
-	maxBlockNumber int64
-	minBlockNumber int64
-}
-
-func NewMockClient(blocks []*types.Block) *MockClient {
-	return &MockClient{
-		blocks:         blocks,
-		maxBlockNumber: int64(len(blocks)) - 1,
-		minBlockNumber: 0,
-	}
-}
-
-func (c *MockClient) MaxBlockNumber() int64 {
-	return c.maxBlockNumber
-}
-
-func (c *MockClient) MinBlockNumber() int64 {
-	return c.minBlockNumber
-}
-
-func (c *MockClient) Blocks() []*types.Block {
-	if c.blocks == nil {
-		return nil
-	}
-	blocksCpy := make([]*types.Block, len(c.blocks))
-	for i, block := range c.blocks {
-		cpy := *block
-		blocksCpy[i] = &cpy
-	}
-	return blocksCpy
-}
-
-func (c *MockClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error) {
-	// return error if minBlockNumber is less than minBlockNumber or maxBlockNumber is greater than maxBlockNumber
-	if minBlockNumber < c.minBlockNumber || maxBlockNumber > c.maxBlockNumber {
-		return nil, fmt.Errorf("invalid block range for mock client")
-	}
-	hashes := make([]*chainhash.Hash, 0)
-	for _, block := range c.blocks {
-		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
-		if err != nil {
-			return nil, err
-		}
-		hashes = append(hashes, hash)
-	}
-	return hashes, nil
-}
-
-func (c *MockClient) GetBlockHeaders(hashes []*chainhash.Hash) ([]*types.BlockHeader, error) {
-	// getblock headers by searching for the block
-	headers := make([]*types.BlockHeader, 0)
-	for _, hash := range hashes {
-		found := false
-		for _, block := range c.Blocks() {
-			if block.BlockHeader.Hash() == hash.String() {
-				headers = append(headers, block.BlockHeader)
-				found = true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("block not found")
-		}
-	}
-	return headers, nil
-}
-
-func (c *MockClient) GetBlocks(hashes []*chainhash.Hash) ([]*types.Block, error) {
-	// get blocks by searching for the block
-	blocks := make([]*types.Block, 0)
-	for _, hash := range hashes {
-		found := false
-		for _, block := range c.Blocks() {
-			if block.BlockHeader.Hash() == hash.String() {
-				blocks = append(blocks, block)
-				found = true
-			}
-		}
-		if !found {
-			return nil, fmt.Errorf("block not found")
-		}
-	}
-	return blocks, nil
-}
-
 func block_filename(height int64) string {
 	return "testdata/block_" + fmt.Sprint(height) + ".json"
 }
 
 const MinBlockNumber = int64(0)
 const MaxBlockNumber = int64(5)
+
+func getTestBlockHashes(mockClient *MockClient) []*chainhash.Hash {
+	hashes := make([]*chainhash.Hash, 0)
+	for _, block := range mockClient.Blocks() {
+		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
+		if err != nil {
+			return nil
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes
+}
+
+type LoaderTestSuite struct {
+	suite.Suite
+	mockClient   *MockClient
+	mockDatabase *MockDatabase
+}
 
 func (s *LoaderTestSuite) SetupTest() {
 	// Parse testdata and add to test suite
@@ -129,18 +55,8 @@ func (s *LoaderTestSuite) SetupTest() {
 	}
 	// Create mock client and add to test suite
 	s.mockClient = NewMockClient(blocks)
-}
-
-func getTestBlockHashes(mockClient *MockClient) []*chainhash.Hash {
-	hashes := make([]*chainhash.Hash, 0)
-	for _, block := range mockClient.Blocks() {
-		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
-		if err != nil {
-			return nil
-		}
-		hashes = append(hashes, hash)
-	}
-	return hashes
+	// Create mock database and add to test suite
+	s.mockDatabase = NewMockDatabase()
 }
 
 func (s *LoaderTestSuite) TestBlockRangeHandler() {
@@ -158,7 +74,7 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 		wantErr bool
 	}{
 		{
-			name: "Test GetBlockHashesByRange with full range",
+			name: "Test blockRangeHandler with full range",
 			args: args{
 				client: s.mockClient,
 				msg: &LoaderMsg[BlockRange]{
@@ -184,7 +100,7 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 			wantErr: false,
 		},
 		{
-			name: "Test GetBlockHashesByRange with invalid block range",
+			name: "Test blockRangeHandler with invalid block range",
 			args: args{
 				client: s.mockClient,
 				msg: &LoaderMsg[BlockRange]{
@@ -243,7 +159,7 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 		wantErr bool
 	}{
 		{
-			name: "Test GetBlocksByHashes with full range",
+			name: "Test blockHashHandler with full range",
 			args: args{
 				client: s.mockClient,
 				msg: &LoaderMsg[[]*chainhash.Hash]{
@@ -266,7 +182,7 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 			wantErr: false,
 		},
 		{
-			name: "Test GetBlocksByHashes with invalid hash",
+			name: "Test blockHashHandler with invalid hash",
 			args: args{
 				client: s.mockClient,
 				msg: &LoaderMsg[[]*chainhash.Hash]{
@@ -299,6 +215,57 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 }
 
 func (s *LoaderTestSuite) TestBlockHandler() {
+	type args struct {
+		dbTx *MockDBTx
+		msg  *LoaderMsg[[]*types.Block]
+	}
+
+	dbtx_full := s.mockDatabase.NewMockDBTx()
+	blocks := s.mockClient.Blocks()
+
+	tests := []struct {
+		name    string
+		args    args
+		wantErr bool
+	}{
+		{
+			name: "Test blockHandler with full blocks",
+			args: args{
+				dbTx: dbtx_full,
+				msg: &LoaderMsg[[]*types.Block]{
+					blockRange: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber,
+					},
+					dbTx: dbtx_full,
+					data: blocks,
+				},
+			},
+			wantErr: false,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			err := blockHandler(tt.args.dbTx, tt.args.msg)
+			if tt.wantErr {
+				assert.Error(s.T(), err)
+				return
+			}
+			assert.NoError(s.T(), err)
+
+			correctHeaders := make([]*types.BlockHeader, len(blocks))
+			correctTxs := make([]*types.Transaction, 0)
+			for i, block := range tt.args.msg.data {
+				correctHeaders[i] = block.BlockHeader
+				correctTxs = append(correctTxs, block.Transactions()...)
+			}
+
+			assert.Equal(s.T(), correctHeaders, tt.args.dbTx.ReceivedBlockHeaders())
+			assert.Equal(s.T(), correctTxs, tt.args.dbTx.ReceivedTxs())
+
+		})
+	}
 
 }
 
