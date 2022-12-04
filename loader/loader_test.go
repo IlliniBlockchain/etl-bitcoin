@@ -1,6 +1,7 @@
 package loader
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"math/rand"
@@ -269,9 +270,39 @@ func (s *LoaderTestSuite) TestBlockHandler() {
 
 }
 
-// Requires integration test or dummy client
-func (s *LoaderTestSuite) TestLoaderManager() {
+// q: how to use contexts?
+// a: https://blog.golang.org/context
 
+func (s *LoaderTestSuite) TestLoaderManager() {
+	// create a context without a cancel
+	ctx := context.Background()
+	// Test loader manager with full range
+	loaderManager, _ := NewLoaderManager(ctx, s.mockClient, s.mockDatabase, nil)
+	dbTx := s.mockDatabase.NewMockDBTx()
+
+	blockRange := BlockRange{
+		startBlockHeight: MinBlockNumber,
+		endBlockHeight:   MaxBlockNumber,
+	}
+	loaderManager.SendInput(blockRange, dbTx)
+
+	// wait for the loader manager to finish
+	loaderManager.Close()
+
+	// commit the dbTx
+	_ = dbTx.Commit()
+
+	// check that the dbTx has the correct data
+	correctHeaders := make([]*types.BlockHeader, len(s.mockClient.Blocks()))
+	correctTxs := make([]*types.Transaction, 0)
+	for i, block := range s.mockClient.Blocks() {
+		correctHeaders[i] = block.BlockHeader
+		correctTxs = append(correctTxs, block.Transactions()...)
+	}
+
+	assert.Equal(s.T(), correctHeaders, dbTx.ReceivedBlockHeaders())
+	assert.Equal(s.T(), correctTxs, dbTx.ReceivedTxs())
+	assert.Equal(s.T(), dbTx.Committed(), true)
 }
 
 func TestLoaderTestSuite(t *testing.T) {
