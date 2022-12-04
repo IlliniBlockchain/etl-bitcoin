@@ -23,7 +23,7 @@ func main() {
 	}
 	defer client.Shutdown()
 
-	db, err := neo4j_csv.NewDatabase(context.Background(), nil)
+	db, err := neo4j_csv.NewDatabase(context.Background(), map[string]interface{}{"dataDir": "./data"})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -35,5 +35,22 @@ func main() {
 	}
 	defer loaderManager.Close()
 
-	loaderManager.SendInput(loader.BlockRange{Start: 0, End: 100}, nil)
+	stats := make(chan *loader.LoaderStats)
+	go func() {
+		for stat := range stats {
+			stat.Wait()
+			log.Print(stat)
+		}
+	}()
+
+	inc := int64(10_000)
+	min := int64(0)
+	max := int64(300_000)
+	for min < max {
+		loaderManager.SendInput(loader.BlockRange{Start: min, End: min + inc})
+		if err := loaderManager.Close(); err != nil {
+			log.Fatal(err)
+		}
+		min += inc
+	}
 }
