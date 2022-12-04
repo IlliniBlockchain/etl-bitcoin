@@ -2,6 +2,7 @@ package neo4j_csv
 
 import (
 	"context"
+	"path/filepath"
 	"runtime"
 	"strconv"
 
@@ -37,13 +38,17 @@ type Database struct {
 //
 // Implements database.DBConstructor.
 func NewDatabase(ctx context.Context, opts database.DBOptions) (database.Database, error) {
+	dataDir, err := database.GetOpt(opts, "dataDir", ".")
+	if err != nil {
+		return nil, err
+	}
 	filePaths := make(map[string]string)
 	for _, fileKey := range fileKeys {
 		filePath, err := database.GetOpt(opts, fileKey, fileKey+".csv")
 		if err != nil {
 			return nil, err
 		}
-		filePaths[fileKey] = filePath
+		filePaths[fileKey] = filepath.Join(dataDir, filePath)
 	}
 	maxWorkers, err := database.GetOpt(opts, "maxWorkers", runtime.NumCPU())
 	if err != nil {

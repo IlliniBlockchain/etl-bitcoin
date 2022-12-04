@@ -70,8 +70,9 @@ func (s *DBTxTestSuite) SetupTest() {
 	opts := make(map[string]interface{})
 	for _, fileKey := range fileKeys {
 		// Point filepaths to testdata with _test.csv suffix for easy clean up during tear down.
-		opts[fileKey] = filepath.Join("testdata", fileKey+"_test.csv")
+		opts[fileKey] = fileKey + "_test.csv"
 	}
+	opts["dataDir"] = "testdata"
 	s.db, err = NewDatabase(context.Background(), opts)
 	s.NoError(err)
 	s.dbTx, err = s.db.NewDBTx()
