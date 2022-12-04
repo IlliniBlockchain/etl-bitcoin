@@ -80,20 +80,20 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 				client: s.mockClient,
 				msg: &LoaderMsg[BlockRange]{
 					blockRange: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber,
 					},
 					dbTx: nil,
 					data: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber,
 					},
 				},
 			},
 			want: &LoaderMsg[[]*chainhash.Hash]{
 				blockRange: BlockRange{
-					startBlockHeight: MinBlockNumber,
-					endBlockHeight:   MaxBlockNumber,
+					Start: MinBlockNumber,
+					End:   MaxBlockNumber,
 				},
 				dbTx: nil,
 				data: hashes,
@@ -106,13 +106,13 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 				client: s.mockClient,
 				msg: &LoaderMsg[BlockRange]{
 					blockRange: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber + 1,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber + 1,
 					},
 					dbTx: nil,
 					data: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber + 1,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber + 1,
 					},
 				},
 			},
@@ -163,8 +163,8 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 				client: s.mockClient,
 				msg: &LoaderMsg[[]*chainhash.Hash]{
 					blockRange: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber,
 					},
 					dbTx: nil,
 					data: hashes,
@@ -172,8 +172,8 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 			},
 			want: &LoaderMsg[[]*types.Block]{
 				blockRange: BlockRange{
-					startBlockHeight: MinBlockNumber,
-					endBlockHeight:   MaxBlockNumber,
+					Start: MinBlockNumber,
+					End:   MaxBlockNumber,
 				},
 				dbTx: nil,
 				data: blocks,
@@ -186,8 +186,8 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 				client: s.mockClient,
 				msg: &LoaderMsg[[]*chainhash.Hash]{
 					blockRange: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber,
 					},
 					dbTx: nil,
 					data: []*chainhash.Hash{invalidHash},
@@ -233,8 +233,8 @@ func (s *LoaderTestSuite) TestBlockHandler() {
 				dbTx: dbtx_full,
 				msg: &LoaderMsg[[]*types.Block]{
 					blockRange: BlockRange{
-						startBlockHeight: MinBlockNumber,
-						endBlockHeight:   MaxBlockNumber,
+						Start: MinBlockNumber,
+						End:   MaxBlockNumber,
 					},
 					dbTx: dbtx_full,
 					data: blocks,
@@ -279,8 +279,8 @@ func (s *LoaderTestSuite) TestLoaderManager() {
 	dbTx := s.mockDatabase.NewMockDBTx()
 
 	blockRange := BlockRange{
-		startBlockHeight: MinBlockNumber,
-		endBlockHeight:   MaxBlockNumber,
+		Start: MinBlockNumber,
+		End:   MaxBlockNumber,
 	}
 	loaderManager.SendInput(blockRange, dbTx)
 

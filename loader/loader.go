@@ -40,8 +40,8 @@ type LoaderMsg[T any] struct {
 type LoaderOptions map[string]interface{}
 
 type BlockRange struct {
-	startBlockHeight int64
-	endBlockHeight   int64
+	Start int64
+	End   int64
 }
 
 // NewLoaderManager creates a new LoaderManager and initiates goroutines for the loaders in a pipeline.
@@ -169,7 +169,7 @@ func (loader *LoaderSink[S]) Run() error {
 // retrieve a list of block hashes.
 func blockRangeHandler(client client.Client, msg *LoaderMsg[BlockRange]) (*LoaderMsg[[]*chainhash.Hash], error) {
 	blockRange := msg.data
-	hashes, err := client.GetBlockHashesByRange(blockRange.startBlockHeight, blockRange.endBlockHeight)
+	hashes, err := client.GetBlockHashesByRange(blockRange.Start, blockRange.End)
 	if err != nil {
 		return nil, err
 	}
