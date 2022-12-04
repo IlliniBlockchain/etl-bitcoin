@@ -48,10 +48,14 @@ func main() {
 	min := int64(0)
 	max := int64(300_000)
 	for min < max {
-		loaderManager.SendInput(loader.BlockRange{Start: min, End: min + inc})
-		if err := loaderManager.Close(); err != nil {
+		stat, err := loaderManager.SendInput(loader.BlockRange{Start: min, End: min + inc})
+		if err != nil {
 			log.Fatal(err)
 		}
+		stats <- stat
 		min += inc
+	}
+	if err := loaderManager.Close(); err != nil {
+		log.Fatal(err)
 	}
 }
