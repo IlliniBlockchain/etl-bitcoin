@@ -2,6 +2,11 @@ package types
 
 import "github.com/btcsuite/btcd/btcjson"
 
+const (
+	BaseBlockReward   = 50.0
+	BlockRewardCutOff = 210_000
+)
+
 // BlockHeader represents a Bitcoin block header.
 //
 // Wraps btcjson.GetBlockVerboseResult.
@@ -96,6 +101,12 @@ func (bh *BlockHeader) PreviousHash() string { return bh.data.PreviousHash }
 
 // NextHash returns the next block hash if it exists, else returns empty string.
 func (bh *BlockHeader) NextHash() string { return bh.data.NextHash }
+
+// Reward returns the mining reward of the block.
+func (bh *BlockHeader) Reward() float64 {
+	rewardLevel := bh.Height() / BlockRewardCutOff
+	return BaseBlockReward / float64(int(1)<<rewardLevel)
+}
 
 // String implements the Stringer interface.
 func (bh *BlockHeader) String() string {

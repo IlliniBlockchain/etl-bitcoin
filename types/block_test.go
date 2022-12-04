@@ -42,6 +42,13 @@ func (s *BlockTestSuite) TestBlockHeaderData() {
 	s.Equal(s.blockHeader409008.NextHash, blk.NextHash())
 }
 
+func (s *BlockTestSuite) TestBlockReward() {
+	blk1000 := NewBlock(s.block1000)
+	blk409008 := NewBlockHeader(s.blockHeader409008)
+	s.EqualValues(50.0, blk1000.Reward())
+	s.EqualValues(25.0, blk409008.Reward())
+}
+
 func (s *BlockTestSuite) TestBlockData() {
 	blk := NewBlock(s.block409008)
 	s.Equal(s.block409008.Hash, blk.Hash())
