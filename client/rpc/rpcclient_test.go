@@ -145,7 +145,7 @@ type BlockHashTest struct {
 func GetBlockHashTestTable(suite *RPCClientTestSuite) []BlockHashTest {
 
 	rand.Seed(time.Now().UnixNano())
-	invalidHashBytes := make([]byte, 256)
+	invalidHashBytes := make([]byte, 32)
 	rand.Read(invalidHashBytes)
 	invalidHash, _ := chainhash.NewHash(invalidHashBytes)
 
