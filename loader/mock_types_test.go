@@ -101,8 +101,8 @@ func NewMockDatabase() *MockDatabase {
 	return &MockDatabase{}
 }
 
-func (db *MockDatabase) LastBlockhash() (*chainhash.Hash, error) {
-	return nil, nil
+func (db *MockDatabase) LastBlockNumber() (int64, error) {
+	return 0, nil
 }
 
 func (db *MockDatabase) NewDBTx() (database.DBTx, error) {
@@ -127,14 +127,12 @@ type MockDBTx struct {
 	committed            bool
 }
 
-func (tx *MockDBTx) AddBlockHeader(header *types.BlockHeader) error {
+func (tx *MockDBTx) AddBlockHeader(header *types.BlockHeader) {
 	tx.receivedBlockHeaders = append(tx.receivedBlockHeaders, header)
-	return nil
 }
 
-func (tx *MockDBTx) AddTransaction(txn *types.Transaction) error {
+func (tx *MockDBTx) AddTransaction(txn *types.Transaction) {
 	tx.receivedTxs = append(tx.receivedTxs, txn)
-	return nil
 }
 
 func (tx *MockDBTx) Commit() error {
