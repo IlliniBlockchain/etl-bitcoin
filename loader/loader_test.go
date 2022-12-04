@@ -235,13 +235,14 @@ func (s *LoaderTestSuite) TestLoaderManager() {
 		Start: MinBlockNumber,
 		End:   MaxBlockNumber,
 	}
-	loaderManager.SendInput(blockRange)
+	stats, err := loaderManager.SendInput(blockRange)
+	stats.dbTx = dbTx
+	assert.NoError(s.T(), err)
+
+	stats.Wait()
 
 	// wait for the loader manager to finish
 	loaderManager.Close()
-
-	// commit the dbTx
-	_ = dbTx.Commit()
 
 	// check that the dbTx has the correct data
 	correctHeaders := make([]*types.BlockHeader, len(s.mockClient.Blocks()))
@@ -251,9 +252,10 @@ func (s *LoaderTestSuite) TestLoaderManager() {
 		correctTxs = append(correctTxs, block.Transactions()...)
 	}
 
+	// TODO: fix this
 	assert.Equal(s.T(), correctHeaders, dbTx.ReceivedBlockHeaders())
 	assert.Equal(s.T(), correctTxs, dbTx.ReceivedTxs())
-	assert.Equal(s.T(), dbTx.Committed(), true)
+	assert.True(s.T(), dbTx.Committed())
 }
 
 func TestLoaderTestSuite(t *testing.T) {
