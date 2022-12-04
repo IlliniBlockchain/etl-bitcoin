@@ -32,7 +32,7 @@ type LoaderManager struct {
 // LoaderMsg stores state for data being passed through loaders.
 type LoaderMsg[T any] struct {
 	blockRange BlockRange
-	dbTx       *database.DBTx
+	dbTx       database.DBTx
 	data       T
 }
 
@@ -80,7 +80,7 @@ func (loader *LoaderManager) Close() error {
 func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx) {
 	msg := &LoaderMsg[BlockRange]{
 		blockRange,
-		&dbTx,
+		dbTx,
 		blockRange,
 	}
 	loader.inputCh <- msg
@@ -157,7 +157,7 @@ func NewLoaderSink[S any](src <-chan *LoaderMsg[S], f LoaderSinkFunc[S]) *Loader
 
 func (loader *LoaderSink[S]) Run() error {
 	for msg := range loader.src {
-		err := loader.f(*msg.dbTx, msg)
+		err := loader.f(msg.dbTx, msg)
 		if err != nil {
 			return err
 		}
