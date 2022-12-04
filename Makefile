@@ -46,16 +46,16 @@ race: dep ## Run data race detector
 msan: dep ## Run memory sanitizer
 	CC=clang CXX=clang++ CGO_ENABLED=1 go test -msan -short ${PKG_LIST}
 
-coverage: ## Generate global code coverage report
-	@go test -coverprofile=coverage.cov ${PKG_LIST}
+coverage: docker.start.bitcoin-core ## Generate global code coverage report
+	@go test -coverprofile=coverage.cov ${PKG_LIST}; make docker.stop > /dev/null
 	@go tool cover -func coverage.cov
-	@rm "coverage.cov";
+	@rm "coverage.cov"
 
-coverhtml: ## Generate global code coverage report in HTML
-	@go test -coverprofile=coverage.cov ${PKG_LIST}
+coverhtml: docker.start.bitcoin-core ## Generate global code coverage report in HTML
+	@go test -coverprofile=coverage.cov ${PKG_LIST}; make docker.stop > /dev/null
 	@go tool cover -func coverage.cov
 	@go tool cover -html=coverage.cov -o coverage.html
-	@rm "coverage.cov";
+	@rm "coverage.cov"
 
 dep: ## Get the dependencies
 	@go get -v -d ./...

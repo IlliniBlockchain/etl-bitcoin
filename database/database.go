@@ -4,13 +4,12 @@ import (
 	"context"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
 )
 
 // Database represents a database connection.
 type Database interface {
-	// LastBlockhash returns the blockhash of the last block committed to the database.
-	LastBlockhash() (*chainhash.Hash, error)
+	// LastBlockNumber returns the block height of the last block committed to the database.
+	LastBlockNumber() (int64, error)
 	// NewDBTx returns a new DBTx.
 	NewDBTx() (DBTx, error)
 	// Close closes the database connection. Only callable once.
@@ -20,9 +19,9 @@ type Database interface {
 // DBTx represents a database transaction to make atomic changes to a database.
 type DBTx interface {
 	// AddBlockHeader adds block header data to this database transaction.
-	AddBlockHeader(blockheaders *types.BlockHeader) error
+	AddBlockHeader(blockheaders *types.BlockHeader)
 	// AddTransaction adds transaction data to this database transaction.
-	AddTransaction(tx *types.Transaction) error
+	AddTransaction(tx *types.Transaction)
 	// Commit commits this database transaction to a database.
 	Commit() error
 }
