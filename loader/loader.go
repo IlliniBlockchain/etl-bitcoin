@@ -161,42 +161,7 @@ func (loader *LoaderSink[S]) Run() error {
 		if err != nil {
 			return err
 		}
-	}
-	return nil
-}
-
-// blockRangeHandler is a LoaderFunc that uses a block range to
-// retrieve a list of block hashes.
-func blockRangeHandler(client client.Client, msg *LoaderMsg[BlockRange]) (*LoaderMsg[[]*chainhash.Hash], error) {
-	blockRange := msg.data
-	hashes, err := client.GetBlockHashesByRange(blockRange.Start, blockRange.End)
-	if err != nil {
-		return nil, err
-	}
-	newMsg := &LoaderMsg[[]*chainhash.Hash]{msg.blockRange, msg.dbTx, hashes}
-	return newMsg, nil
-}
-
-// blockHashHandler is a LoaderFunc that uses a list of block
-// hashes to retrieve block header and transaction data.
-func blockHashHandler(client client.Client, msg *LoaderMsg[[]*chainhash.Hash]) (*LoaderMsg[[]*types.Block], error) {
-	hashes := msg.data
-	blocks, err := client.GetBlocks(hashes)
-	if err != nil {
-		return nil, err
-	}
-	newMsg := &LoaderMsg[[]*types.Block]{msg.blockRange, msg.dbTx, blocks}
-	return newMsg, nil
-}
-
-// blockHandler is a LoaderSinkFunc that fills a database transaction with
-// block headers and transactions.
-func blockHandler(dbTx database.DBTx, msg *LoaderMsg[[]*types.Block]) error {
-	blocks := msg.data
-	for _, block := range blocks {
-		dbTx.AddBlockHeader(block.BlockHeader)
-		for _, tx := range block.Transactions() {
-			dbTx.AddTransaction(tx)
+			return err
 		}
 	}
 	return nil
