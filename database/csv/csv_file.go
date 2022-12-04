@@ -62,6 +62,7 @@ func (cf *csvFile) writeAll(records [][]string) error {
 		return err
 	}
 	w := csv.NewWriter(f)
+	w.UseCRLF = true
 	if err := w.WriteAll(records); err != nil {
 		return err
 	} else if err := w.Error(); err != nil {
