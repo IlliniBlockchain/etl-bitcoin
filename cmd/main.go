@@ -36,6 +36,7 @@ func main() {
 	defer loaderManager.Close()
 
 	stats := make(chan *loader.LoaderStats)
+	defer close(stats)
 	go func() {
 		for stat := range stats {
 			stat.Wait()
