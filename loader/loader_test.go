@@ -3,8 +3,10 @@ package loader
 import (
 	"encoding/json"
 	"fmt"
+	"math/rand"
 	"os"
 	"testing"
+	"time"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
@@ -74,10 +76,15 @@ func (c *MockClient) GetBlockHeaders(hashes []*chainhash.Hash) ([]*types.BlockHe
 	// getblock headers by searching for the block
 	headers := make([]*types.BlockHeader, 0)
 	for _, hash := range hashes {
-		for _, block := range c.blocks {
+		found := false
+		for _, block := range c.Blocks() {
 			if block.BlockHeader.Hash() == hash.String() {
 				headers = append(headers, block.BlockHeader)
+				found = true
 			}
+		}
+		if !found {
+			return nil, fmt.Errorf("block not found")
 		}
 	}
 	return headers, nil
@@ -87,10 +94,15 @@ func (c *MockClient) GetBlocks(hashes []*chainhash.Hash) ([]*types.Block, error)
 	// get blocks by searching for the block
 	blocks := make([]*types.Block, 0)
 	for _, hash := range hashes {
-		for _, block := range c.blocks {
+		found := false
+		for _, block := range c.Blocks() {
 			if block.BlockHeader.Hash() == hash.String() {
 				blocks = append(blocks, block)
+				found = true
 			}
+		}
+		if !found {
+			return nil, fmt.Errorf("block not found")
 		}
 	}
 	return blocks, nil
@@ -119,20 +131,25 @@ func (s *LoaderTestSuite) SetupTest() {
 	s.mockClient = NewMockClient(blocks)
 }
 
+func getTestBlockHashes(mockClient *MockClient) []*chainhash.Hash {
+	hashes := make([]*chainhash.Hash, 0)
+	for _, block := range mockClient.Blocks() {
+		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
+		if err != nil {
+			return nil
+		}
+		hashes = append(hashes, hash)
+	}
+	return hashes
+}
+
 func (s *LoaderTestSuite) TestBlockRangeHandler() {
 	type args struct {
 		client client.Client
 		msg    *LoaderMsg[BlockRange]
 	}
 
-	hashes := make([]*chainhash.Hash, 0)
-	for _, block := range s.mockClient.Blocks() {
-		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
-		if err != nil {
-			s.T().Fatal(err)
-		}
-		hashes = append(hashes, hash)
-	}
+	hashes := getTestBlockHashes(s.mockClient)
 
 	tests := []struct {
 		name    string
@@ -166,7 +183,6 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 			},
 			wantErr: false,
 		},
-		// add test case for invalid block range
 		{
 			name: "Test GetBlockHashesByRange with invalid block range",
 			args: args{
@@ -204,6 +220,81 @@ func (s *LoaderTestSuite) TestBlockRangeHandler() {
 }
 
 func (s *LoaderTestSuite) TestBlockHashHandler() {
+	type args struct {
+		client client.Client
+		msg    *LoaderMsg[[]*chainhash.Hash]
+	}
+
+	hashes := getTestBlockHashes(s.mockClient)
+	blocks := s.mockClient.Blocks()
+
+	rand.Seed(time.Now().UnixNano())
+	invalidHashBytes := make([]byte, 32)
+	rand.Read(invalidHashBytes)
+	invalidHash, err := chainhash.NewHash(invalidHashBytes)
+	if err != nil {
+		s.T().Fatal(err)
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *LoaderMsg[[]*types.Block]
+		wantErr bool
+	}{
+		{
+			name: "Test GetBlocksByHashes with full range",
+			args: args{
+				client: s.mockClient,
+				msg: &LoaderMsg[[]*chainhash.Hash]{
+					blockRange: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber,
+					},
+					dbTx: nil,
+					data: hashes,
+				},
+			},
+			want: &LoaderMsg[[]*types.Block]{
+				blockRange: BlockRange{
+					startBlockHeight: MinBlockNumber,
+					endBlockHeight:   MaxBlockNumber,
+				},
+				dbTx: nil,
+				data: blocks,
+			},
+			wantErr: false,
+		},
+		{
+			name: "Test GetBlocksByHashes with invalid hash",
+			args: args{
+				client: s.mockClient,
+				msg: &LoaderMsg[[]*chainhash.Hash]{
+					blockRange: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber,
+					},
+					dbTx: nil,
+					data: []*chainhash.Hash{invalidHash},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got, err := blockHashHandler(tt.args.client, tt.args.msg)
+
+			if tt.wantErr {
+				assert.Error(s.T(), err)
+				return
+			}
+			assert.NoError(s.T(), err)
+			assert.Equal(s.T(), tt.want, got)
+		})
+	}
 
 }
 
