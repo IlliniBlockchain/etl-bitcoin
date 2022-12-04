@@ -149,9 +149,7 @@ func (s *LoaderTestSuite) TestBlockHashHandler() {
 	invalidHashBytes := make([]byte, 32)
 	rand.Read(invalidHashBytes)
 	invalidHash, err := chainhash.NewHash(invalidHashBytes)
-	if err != nil {
-		s.T().Fatal(err)
-	}
+	s.NoError(err)
 
 	tests := []struct {
 		name    string

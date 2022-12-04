@@ -58,11 +58,11 @@ func NewLoaderManager(ctx context.Context, client client.Client, db database.Dat
 	}
 
 	// loaders
-	blockRangeLoader := NewLoader[BlockRange, []*chainhash.Hash](client, inputCh, blockRangeHandler)
+	blockRangeLoader := NewLoader(client, inputCh, blockRangeHandler)
 	g.Go(blockRangeLoader.Run)
-	blockHashLoader := NewLoader[[]*chainhash.Hash, []*types.Block](client, blockRangeLoader.Dst(), blockHashHandler)
+	blockHashLoader := NewLoader(client, blockRangeLoader.Dst(), blockHashHandler)
 	g.Go(blockHashLoader.Run)
-	blockLoader := NewLoaderSink[[]*types.Block](blockHashLoader.Dst(), blockHandler)
+	blockLoader := NewLoaderSink(blockHashLoader.Dst(), blockHandler)
 	g.Go(blockLoader.Run)
 
 	return loader, nil
