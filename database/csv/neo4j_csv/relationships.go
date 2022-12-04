@@ -84,10 +84,7 @@ type csvCoinbaseInRelation struct {
 }
 
 func (tx csvCoinbaseInRelation) Headers() []string {
-	return []string{
-		":START_ID",
-		":END_ID",
-	}
+	return csvInRelation{}.Headers()
 }
 
 func (tx csvCoinbaseInRelation) Row() []string {
