@@ -194,7 +194,7 @@ func blockHashHandler(client client.Client, msg *LoaderMsg[[]*chainhash.Hash]) (
 func blockHandler(dbTx database.DBTx, msg *LoaderMsg[[]*types.Block]) error {
 	blocks := msg.data
 	for _, block := range blocks {
-		dbTx.AddBlockHeader(&block.BlockHeader)
+		dbTx.AddBlockHeader(block.BlockHeader)
 		for _, tx := range block.Transactions() {
 			dbTx.AddTransaction(tx)
 		}

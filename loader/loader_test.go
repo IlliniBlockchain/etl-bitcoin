@@ -1,6 +1,8 @@
-package database
+package loader
 
 import (
+	"encoding/json"
+	"os"
 	"testing"
 )
 
@@ -48,4 +50,15 @@ func TestBlockHashHandler(t *testing.T) {
 
 func TestBlockHandler(t *testing.T) {
 
+}
+
+func parseTestData[T any](filename string, v *T) error {
+	data, err := os.ReadFile(filename)
+	if err != nil {
+		return err
+	}
+	if err := json.Unmarshal(data, v); err != nil {
+		return err
+	}
+	return nil
 }
