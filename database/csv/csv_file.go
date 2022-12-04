@@ -97,6 +97,12 @@ func (cf *csvFile) read(line, limit int) ([][]string, error) {
 	} else {
 		limit += line
 	}
+
+	// Skip header if it exists.
+	if cf.hasHeader && cf.lastLineRead == 0 {
+		r.Read()
+		cf.lastLineRead++
+	}
 	for cf.lastLineRead < limit {
 		record, err := r.Read()
 		if err != nil {

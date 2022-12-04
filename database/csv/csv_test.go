@@ -190,7 +190,6 @@ func (s *CSVDatabaseTestSuite) TestRead() {
 				table: "basic",
 			},
 			want: [][]string{
-				testRow1.Headers(),
 				testRow1.Row(),
 				testRow2.Row(),
 			},
