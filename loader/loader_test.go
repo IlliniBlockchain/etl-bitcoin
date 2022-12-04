@@ -14,24 +14,41 @@ import (
 
 type LoaderTestSuite struct {
 	suite.Suite
-	client           client.Client
-	startBlockHeight int64
-	endBlockHeight   int64
-	blocks           []*types.Block
+	mockClient *MockClient
 }
 
 // mock client
 type MockClient struct {
-	blocks []*types.Block
+	blocks         []*types.Block
+	maxBlockNumber int64
+	minBlockNumber int64
 }
 
 func NewMockClient(blocks []*types.Block) *MockClient {
 	return &MockClient{
-		blocks: blocks,
+		blocks:         blocks,
+		maxBlockNumber: int64(len(blocks)) - 1,
+		minBlockNumber: 0,
 	}
 }
 
+func (c *MockClient) MaxBlockNumber() int64 {
+	return c.maxBlockNumber
+}
+
+func (c *MockClient) MinBlockNumber() int64 {
+	return c.minBlockNumber
+}
+
+func (c *MockClient) Blocks() []*types.Block {
+	return c.blocks
+}
+
 func (c *MockClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error) {
+	// return error if minBlockNumber is less than minBlockNumber or maxBlockNumber is greater than maxBlockNumber
+	if minBlockNumber < c.minBlockNumber || maxBlockNumber > c.maxBlockNumber {
+		return nil, fmt.Errorf("invalid block range for mock client")
+	}
 	hashes := make([]*chainhash.Hash, 0)
 	for _, block := range c.blocks {
 		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
@@ -73,21 +90,22 @@ func block_filename(height int64) string {
 	return "testdata/block_" + fmt.Sprint(height) + ".json"
 }
 
+const MinBlockNumber = int64(0)
+const MaxBlockNumber = int64(5)
+
 func (s *LoaderTestSuite) SetupTest() {
 	// Parse testdata and add to test suite
-	s.startBlockHeight = 0
-	s.endBlockHeight = 5
-	s.blocks = make([]*types.Block, 0)
-	for i := s.startBlockHeight; i <= s.endBlockHeight; i++ {
+	blocks := make([]*types.Block, 0)
+	for i := MinBlockNumber; i <= MaxBlockNumber; i++ {
 		var block types.Block
 		filename := block_filename(i)
 		if err := parseTestData(filename, &block); err != nil {
 			s.T().Fatal(err)
 		}
-		s.blocks = append(s.blocks, &block)
+		blocks = append(blocks, &block)
 	}
 	// Create mock client and add to test suite
-	s.client = NewMockClient(s.blocks)
+	s.mockClient = NewMockClient(blocks)
 }
 
 func (s *LoaderTestSuite) TestBlockRangeHandler(t *testing.T) {
