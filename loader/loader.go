@@ -1,89 +1,14 @@
 package loader
 
 import (
-	"context"
-	"sync"
-
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/database"
-	"github.com/IlliniBlockchain/etl-bitcoin/types"
-	"github.com/btcsuite/btcd/chaincfg/chainhash"
-	"golang.org/x/sync/errgroup"
 )
-
-// ILoaderManager outlines an interface for a loader manager.
-type ILoaderManager interface {
-	SendInput(BlockRange, database.DBTx)
-	Close()
-}
-
-// LoaderManager stores state for managing loaders for loading data from a `Client` to
-// a `Database`.
-type LoaderManager struct {
-	client  client.Client
-	db      database.Database
-	inputCh chan *LoaderMsg[BlockRange]
-
-	ctx      context.Context
-	stopOnce sync.Once
-	g        *errgroup.Group
-}
 
 // LoaderMsg stores state for data being passed through loaders.
 type LoaderMsg[T any] struct {
-	blockRange BlockRange
-	dbTx       database.DBTx
-	data       T
-}
-
-// LoaderOptions represents a map of arbitrary options when constructing a LoaderManager.
-type LoaderOptions map[string]interface{}
-
-type BlockRange struct {
-	Start int64
-	End   int64
-}
-
-// NewLoaderManager creates a new LoaderManager and initiates goroutines for the loaders in a pipeline.
-func NewLoaderManager(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*LoaderManager, error) {
-	// initialize struct
-	g, ctx := errgroup.WithContext(ctx)
-	inputCh := make(chan *LoaderMsg[BlockRange])
-	loader := &LoaderManager{
-		client:  client,
-		db:      db,
-		inputCh: inputCh,
-		ctx:     ctx,
-		g:       g,
-	}
-
-	// loaders
-	blockRangeLoader := NewLoader(client, inputCh, blockRangeHandler)
-	g.Go(blockRangeLoader.Run)
-	blockHashLoader := NewLoader(client, blockRangeLoader.Dst(), blockHashHandler)
-	g.Go(blockHashLoader.Run)
-	blockLoader := NewLoaderSink(blockHashLoader.Dst(), blockHandler)
-	g.Go(blockLoader.Run)
-
-	return loader, nil
-}
-
-// Close gracefully shuts down all loader processes.
-func (loader *LoaderManager) Close() error {
-	loader.stopOnce.Do(func() {
-		close(loader.inputCh)
-	})
-	return loader.g.Wait()
-}
-
-// SendInput starts the given parameters on the first stage of the loader pipeline.
-func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx) {
-	msg := &LoaderMsg[BlockRange]{
-		blockRange,
-		dbTx,
-		blockRange,
-	}
-	loader.inputCh <- msg
+	dbTx *dBTxWithStats
+	data T
 }
 
 // ILoader is a simple interface for loaders.
@@ -102,7 +27,7 @@ type Loader[S, D any] struct {
 	f      LoaderFunc[S, D]
 }
 
-type LoaderFunc[S, D any] func(client.Client, *LoaderMsg[S]) (*LoaderMsg[D], error)
+type LoaderFunc[S, D any] func(client.Client, S) (D, error)
 
 func (loader *Loader[S, D]) Dst() <-chan *LoaderMsg[D] {
 	return loader.dst
@@ -130,11 +55,11 @@ func (loader *Loader[S, D]) Run() error {
 
 	// Listen for messages from upstream loaders.
 	for msg := range loader.src {
-		output, err := loader.f(loader.client, msg)
+		output, err := loader.f(loader.client, msg.data)
 		if err != nil {
 			return err
 		}
-		loader.dst <- output
+		loader.dst <- &LoaderMsg[D]{msg.dbTx, output}
 	}
 	return nil
 }
@@ -145,7 +70,7 @@ type LoaderSink[S any] struct {
 	f   LoaderSinkFunc[S]
 }
 
-type LoaderSinkFunc[S any] func(database.DBTx, *LoaderMsg[S]) error
+type LoaderSinkFunc[S any] func(database.DBTx, S) error
 
 func NewLoaderSink[S any](src <-chan *LoaderMsg[S], f LoaderSinkFunc[S]) *LoaderSink[S] {
 	loader := &LoaderSink[S]{
@@ -157,10 +82,10 @@ func NewLoaderSink[S any](src <-chan *LoaderMsg[S], f LoaderSinkFunc[S]) *Loader
 
 func (loader *LoaderSink[S]) Run() error {
 	for msg := range loader.src {
-		err := loader.f(msg.dbTx, msg)
-		if err != nil {
+		if err := loader.f(msg.dbTx, msg.data); err != nil {
 			return err
 		}
+		if err := msg.dbTx.Commit(); err != nil {
 			return err
 		}
 	}
