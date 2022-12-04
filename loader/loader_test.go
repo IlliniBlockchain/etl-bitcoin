@@ -8,7 +8,9 @@ import (
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
+	"github.com/btcsuite/btcd/btcjson"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
@@ -41,7 +43,15 @@ func (c *MockClient) MinBlockNumber() int64 {
 }
 
 func (c *MockClient) Blocks() []*types.Block {
-	return c.blocks
+	if c.blocks == nil {
+		return nil
+	}
+	blocksCpy := make([]*types.Block, len(c.blocks))
+	for i, block := range c.blocks {
+		cpy := *block
+		blocksCpy[i] = &cpy
+	}
+	return blocksCpy
 }
 
 func (c *MockClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error) {
@@ -97,65 +107,112 @@ func (s *LoaderTestSuite) SetupTest() {
 	// Parse testdata and add to test suite
 	blocks := make([]*types.Block, 0)
 	for i := MinBlockNumber; i <= MaxBlockNumber; i++ {
-		var block types.Block
+		var blockResult btcjson.GetBlockVerboseTxResult
 		filename := block_filename(i)
-		if err := parseTestData(filename, &block); err != nil {
+		if err := parseTestData(filename, &blockResult); err != nil {
 			s.T().Fatal(err)
 		}
-		blocks = append(blocks, &block)
+		var block = types.NewBlock(blockResult)
+		blocks = append(blocks, block)
 	}
 	// Create mock client and add to test suite
 	s.mockClient = NewMockClient(blocks)
 }
 
-func (s *LoaderTestSuite) TestBlockRangeHandler(t *testing.T) {
+func (s *LoaderTestSuite) TestBlockRangeHandler() {
 	type args struct {
 		client client.Client
 		msg    *LoaderMsg[BlockRange]
 	}
 
-	// type args struct {
-	// 	client client.Client
-	// 	msg    *LoaderMsg[BlockRange]
-	// }
-	// tests := []struct {
-	// 	name    string
-	// 	args    args
-	// 	want    *LoaderMsg[[]*chainhash.Hash]
-	// 	wantErr bool
-	// }{
-	// 	{
-	// 		name: "return option",
-	// 		args: args{
-	// 			client: nil,
-	// 			msg: nil,
-	// 		},
-	// 		want: 1,
-	// 	},
-	// }
-	// for _, tt := range tests {
-	// 	t.Run(tt.name, func(t *testing.T) {
-	// 		got, err :=
-	// 		if tt.wantErr {
-	// 			assert.Error(t, err)
-	// 			return
-	// 		}
-	// 		assert.Equal(t, tt.want, got)
-	// 	})
-	// }
+	hashes := make([]*chainhash.Hash, 0)
+	for _, block := range s.mockClient.Blocks() {
+		hash, err := chainhash.NewHashFromStr(block.BlockHeader.Hash())
+		if err != nil {
+			s.T().Fatal(err)
+		}
+		hashes = append(hashes, hash)
+	}
+
+	tests := []struct {
+		name    string
+		args    args
+		want    *LoaderMsg[[]*chainhash.Hash]
+		wantErr bool
+	}{
+		{
+			name: "Test GetBlockHashesByRange with full range",
+			args: args{
+				client: s.mockClient,
+				msg: &LoaderMsg[BlockRange]{
+					blockRange: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber,
+					},
+					dbTx: nil,
+					data: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber,
+					},
+				},
+			},
+			want: &LoaderMsg[[]*chainhash.Hash]{
+				blockRange: BlockRange{
+					startBlockHeight: MinBlockNumber,
+					endBlockHeight:   MaxBlockNumber,
+				},
+				dbTx: nil,
+				data: hashes,
+			},
+			wantErr: false,
+		},
+		// add test case for invalid block range
+		{
+			name: "Test GetBlockHashesByRange with invalid block range",
+			args: args{
+				client: s.mockClient,
+				msg: &LoaderMsg[BlockRange]{
+					blockRange: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber + 1,
+					},
+					dbTx: nil,
+					data: BlockRange{
+						startBlockHeight: MinBlockNumber,
+						endBlockHeight:   MaxBlockNumber + 1,
+					},
+				},
+			},
+			want:    nil,
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		s.Run(tt.name, func() {
+			got, err := blockRangeHandler(tt.args.client, tt.args.msg)
+
+			if tt.wantErr {
+				assert.Error(s.T(), err)
+				return
+			}
+			assert.NoError(s.T(), err)
+			assert.Equal(s.T(), tt.want, got)
+		})
+	}
 
 }
 
-func (s *LoaderTestSuite) TestBlockHashHandler(t *testing.T) {
+func (s *LoaderTestSuite) TestBlockHashHandler() {
 
 }
 
-func (s *LoaderTestSuite) TestBlockHandler(t *testing.T) {
+func (s *LoaderTestSuite) TestBlockHandler() {
 
 }
 
 // Requires integration test or dummy client
-func (s *LoaderTestSuite) TestLoaderManager(t *testing.T) {
+func (s *LoaderTestSuite) TestLoaderManager() {
 
 }
 
