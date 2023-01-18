@@ -46,7 +46,7 @@ func (stats *LoaderStats) Wait() {
 }
 
 func (stats *LoaderStats) String() string {
-	return fmt.Sprintf("Loaded %d blocks (%d transactions) in %s and committed in %s", stats.numBlocks, stats.numTransactions, stats.LoadingDuration(), stats.TotalDuration())
+	return fmt.Sprintf("Loaded blocks %d-%d (%d transactions) in %s and committed in %s", stats.blockRange.Start, stats.blockRange.End, stats.numTransactions, stats.LoadingDuration(), stats.TotalDuration())
 }
 
 type dBTxWithStats struct {
@@ -54,13 +54,14 @@ type dBTxWithStats struct {
 	*LoaderStats
 }
 
-func newDBTxWithStats(dbTx database.DBTx) *dBTxWithStats {
+func newDBTxWithStats(dbTx database.DBTx, blockRange BlockRange) *dBTxWithStats {
 	return &dBTxWithStats{
 		DBTx: dbTx,
 		LoaderStats: &LoaderStats{
-			start: time.Now(),
-			done:  make(chan struct{}, 1),
-			dbTx:  dbTx,
+			blockRange: blockRange,
+			start:      time.Now(),
+			done:       make(chan struct{}, 1),
+			dbTx:       dbTx,
 		},
 	}
 }

@@ -18,10 +18,10 @@ type ILoaderManager interface {
 // LoaderManager stores state for managing loaders for loading data from a `Client` to
 // a `Database`.
 type LoaderManager struct {
-	client   client.Client
-	db       database.Database
-	inputCh  chan *LoaderMsg[BlockRange]
-	outputCh chan *LoaderStats
+	client  client.Client
+	db      database.Database
+	inputCh chan *LoaderMsg[BlockRange]
+	// outputCh chan *LoaderStats
 
 	ctx      context.Context
 	stopOnce sync.Once
@@ -73,7 +73,7 @@ func (loader *LoaderManager) SendInput(blockRange BlockRange) (*LoaderStats, err
 	if err != nil {
 		return nil, err
 	}
-	dbTxWithStats := newDBTxWithStats(dbTx)
+	dbTxWithStats := newDBTxWithStats(dbTx, blockRange)
 	msg := &LoaderMsg[BlockRange]{
 		dbTxWithStats,
 		blockRange,
