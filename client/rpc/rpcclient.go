@@ -2,7 +2,6 @@ package rpcclient
 
 import (
 	"fmt"
-	"log"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
@@ -30,7 +29,6 @@ func New(config *rpcclient.ConnConfig, ntfnHandlers *rpcclient.NotificationHandl
 // Hashes are returned in order from `minBlockNumber` to `maxBlockNumber`
 func (client *RPCClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) (hashes []*chainhash.Hash, err error) {
 	if minBlockNumber > maxBlockNumber {
-		log.Printf("minBlockNumber: %d\tmaxBlockNumber: %d\n", minBlockNumber, maxBlockNumber)
 		return nil, fmt.Errorf(
 			"minBlockNumber (%d) must be less than or equal to maxBlockNumber (%d)",
 			minBlockNumber,
@@ -45,7 +43,9 @@ func (client *RPCClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber in
 		hashReqs[i] = client.GetBlockHashAsync(minBlockNumber + int64(i))
 	}
 	// Send
-	client.Send()
+	if err := client.Send(); err != nil {
+		return nil, err
+	}
 	// Receive block hash requests
 	blockHashes := make([]*chainhash.Hash, nBlocks)
 	for i, req := range hashReqs {
@@ -66,7 +66,9 @@ func (client *RPCClient) GetBlockHeaders(hashes []*chainhash.Hash) (blockHeaders
 		blockReqs[i] = client.GetBlockHeaderVerboseAsync(blockHash)
 	}
 	// Send
-	client.Send()
+	if err := client.Send(); err != nil {
+		return nil, err
+	}
 	// Receive block requests
 	blockHeaders = make([]*types.BlockHeader, len(hashes))
 	for i, req := range blockReqs {
@@ -87,7 +89,9 @@ func (client *RPCClient) GetBlocks(hashes []*chainhash.Hash) (blocks []*types.Bl
 		blockReqs[i] = client.GetBlockVerboseTxAsync(blockHash)
 	}
 	// Send
-	client.Send()
+	if err := client.Send(); err != nil {
+		return nil, err
+	}
 	// Receive block requests
 	blocks = make([]*types.Block, len(hashes))
 	for i, req := range blockReqs {
