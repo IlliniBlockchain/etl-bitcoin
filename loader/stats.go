@@ -17,6 +17,7 @@ type LoaderStats struct {
 	numTransactions int64
 	done            chan struct{}
 	dbTx            database.DBTx
+	err             error
 }
 
 func (stats *LoaderStats) BlockRange() BlockRange { return stats.blockRange }
@@ -39,14 +40,15 @@ func (stats *LoaderStats) TotalDuration() time.Duration {
 	return stats.end.Sub(stats.start)
 }
 
-func (stats *LoaderStats) Wait() {
+func (stats *LoaderStats) Wait() error {
 	// TODO: safeguard against concurrent calls to Wait()
 	defer close(stats.done)
 	<-stats.done
+	return stats.err
 }
 
 func (stats *LoaderStats) String() string {
-	return fmt.Sprintf("Loaded blocks %d-%d (%d transactions) in %s and committed in %s", stats.blockRange.Start, stats.blockRange.End, stats.numTransactions, stats.LoadingDuration(), stats.TotalDuration())
+	return fmt.Sprintf("Loaded %s (%d transactions) in %s and committed in %s", stats.blockRange, stats.numTransactions, stats.LoadingDuration(), stats.TotalDuration())
 }
 
 type dBTxWithStats struct {
@@ -78,10 +80,8 @@ func (dbTx *dBTxWithStats) AddTransaction(tx *types.Transaction) {
 
 func (dbTx *dBTxWithStats) Commit() error {
 	dbTx.LoaderStats.loadingEnd = time.Now()
-	if err := dbTx.DBTx.Commit(); err != nil {
-		return err
-	}
+	dbTx.err = dbTx.DBTx.Commit()
 	dbTx.LoaderStats.end = time.Now()
 	dbTx.LoaderStats.done <- struct{}{}
-	return nil
+	return dbTx.err
 }
