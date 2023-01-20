@@ -228,15 +228,14 @@ func (s *LoaderTestSuite) TestLoaderManager() {
 	// create a context without a cancel
 	ctx := context.Background()
 	// Test loader manager with full range
-	loaderManager, _ := NewLoaderManager(ctx, s.mockClient, s.mockDatabase, nil)
+	loaderManager, _ := NewLoaderManager(ctx, s.mockClient)
 	dbTx := s.mockDatabase.NewMockDBTx()
 
 	blockRange := BlockRange{
 		Start: MinBlockNumber,
 		End:   MaxBlockNumber,
 	}
-	stats, err := loaderManager.SendInput(blockRange)
-	stats.dbTx = dbTx
+	stats, err := loaderManager.SendInput(blockRange, dbTx)
 	assert.NoError(s.T(), err)
 
 	stats.Wait()

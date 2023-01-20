@@ -2,6 +2,7 @@ package loader
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
@@ -19,7 +20,6 @@ type ILoaderManager interface {
 // a `Database`.
 type LoaderManager struct {
 	client  client.Client
-	db      database.Database
 	inputCh chan *LoaderMsg[BlockRange]
 	// outputCh chan *LoaderStats
 
@@ -28,33 +28,37 @@ type LoaderManager struct {
 	g        *errgroup.Group
 }
 
-// LoaderOptions represents a map of arbitrary options when constructing a LoaderManager.
-type LoaderOptions map[string]interface{}
-
 type BlockRange struct {
 	Start int64
 	End   int64
 }
 
+func (br BlockRange) String() string {
+	return fmt.Sprintf("blocks %d - %d", br.Start, br.End)
+}
+
 // NewLoaderManager creates a new LoaderManager and initiates goroutines for the loaders in a pipeline.
-func NewLoaderManager(ctx context.Context, client client.Client, db database.Database, opts LoaderOptions) (*LoaderManager, error) {
+func NewLoaderManager(ctx context.Context, client client.Client) (*LoaderManager, error) {
 	// initialize struct
 	g, ctx := errgroup.WithContext(ctx)
 	loader := &LoaderManager{
 		client:  client,
-		db:      db,
-		inputCh: make(chan *LoaderMsg[BlockRange]),
+		inputCh: make(chan *LoaderMsg[BlockRange], 1),
 		ctx:     ctx,
 		g:       g,
 	}
 
 	// loaders
 	blockRangeLoader := NewLoader(client, loader.inputCh, blockRangeHandler)
-	g.Go(blockRangeLoader.Run)
 	blockHashLoader := NewLoader(client, blockRangeLoader.Dst(), blockHashHandler)
-	g.Go(blockHashLoader.Run)
 	blockLoader := NewLoaderSink(blockHashLoader.Dst(), blockHandler)
-	g.Go(blockLoader.Run)
+	loaders := []ILoader{blockRangeLoader, blockHashLoader, blockLoader}
+	for _, loader := range loaders {
+		l := loader
+		g.Go(func() error {
+			return l.Run(ctx)
+		})
+	}
 
 	return loader, nil
 }
@@ -68,16 +72,16 @@ func (loader *LoaderManager) Close() error {
 }
 
 // SendInput starts the given parameters on the first stage of the loader pipeline.
-func (loader *LoaderManager) SendInput(blockRange BlockRange) (*LoaderStats, error) {
-	dbTx, err := loader.db.NewDBTx()
-	if err != nil {
-		return nil, err
-	}
+func (loader *LoaderManager) SendInput(blockRange BlockRange, dbTx database.DBTx) (*LoaderStats, error) {
 	dbTxWithStats := newDBTxWithStats(dbTx, blockRange)
 	msg := &LoaderMsg[BlockRange]{
 		dbTxWithStats,
 		blockRange,
 	}
-	loader.inputCh <- msg
-	return dbTxWithStats.LoaderStats, nil
+	select {
+	case <-loader.ctx.Done():
+		return nil, loader.ctx.Err()
+	case loader.inputCh <- msg:
+		return dbTxWithStats.LoaderStats, nil
+	}
 }
