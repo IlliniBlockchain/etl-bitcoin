@@ -78,20 +78,28 @@ func (db *CSVDatabase) Close() error {
 }
 
 // SendMsgAsync sends a message to the database asynchronously.
-func (db *CSVDatabase) SendMsgAsync(msg CSVMsg) {
+func (db *CSVDatabase) SendMsgAsync(msg CSVMsg) error {
+	if db.ctx.Err() != nil {
+		return db.ctx.Err()
+	}
 	db.msgs <- msg
+	return nil
 }
 
 // SendMsg sends a message to the database synchronously.
 func (db *CSVDatabase) SendMsg(msg CSVMsg) error {
-	db.SendMsgAsync(msg)
+	if err := db.SendMsgAsync(msg); err != nil {
+		return err
+	}
 	return msg.Wait()
 }
 
 // SendMsgs sends a batch of messages to the database synchronously.
 func (db *CSVDatabase) SendMsgs(msgs []CSVMsg) error {
 	for _, msg := range msgs {
-		db.SendMsgAsync(msg)
+		if err := db.SendMsgAsync(msg); err != nil {
+			return err
+		}
 	}
 	for _, msg := range msgs {
 		if err := msg.Wait(); err != nil {
