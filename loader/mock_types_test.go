@@ -42,6 +42,10 @@ func (c *MockClient) Blocks() []*types.Block {
 	return blocksCpy
 }
 
+func (c *MockClient) Close() error {
+	return nil
+}
+
 func (c *MockClient) GetBlockHashesByRange(minBlockNumber, maxBlockNumber int64) ([]*chainhash.Hash, error) {
 	// return error if minBlockNumber is less than minBlockNumber or maxBlockNumber is greater than maxBlockNumber
 	if minBlockNumber < c.minBlockNumber || maxBlockNumber > c.maxBlockNumber {

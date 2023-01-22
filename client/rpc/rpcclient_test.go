@@ -7,30 +7,29 @@ import (
 	"time"
 
 	"github.com/IlliniBlockchain/etl-bitcoin/client"
+	"github.com/IlliniBlockchain/etl-bitcoin/types"
 	"github.com/btcsuite/btcd/btcutil"
 	"github.com/btcsuite/btcd/chaincfg/chainhash"
 	"github.com/btcsuite/btcd/rpcclient"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/suite"
 )
 
-var _ client.Client = (*RPCClient)(nil)
+var _ client.Client = (*RPCClientPool)(nil)
 
-func GetTestRPCClient() (*RPCClient, error) {
-	connCfg := &rpcclient.ConnConfig{
+func config() *rpcclient.ConnConfig {
+	return &rpcclient.ConnConfig{
 		Host:         "localhost:18443", // regtest
 		User:         "test",
 		Pass:         "test",
 		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   true, // Bitcoin core does not provide TLS by default
 	}
-	client, err := New(connCfg, nil)
-	return client, err
 }
 
 type RPCClientTestSuite struct {
 	suite.Suite
-	Client      *RPCClient
+	Pool        *RPCClientPool
+	Client      *rpcclient.Client
 	WalletName  string
 	Address     btcutil.Address
 	BlockCount  int64
@@ -39,37 +38,39 @@ type RPCClientTestSuite struct {
 
 func (suite *RPCClientTestSuite) SetupSuite() {
 	// Initialize client
-	client, err := GetTestRPCClient()
-	assert.NoError(suite.T(), err)
+	client, err := rpcclient.NewBatch(config())
+	suite.NoError(err)
 	suite.Client = client
+	suite.Pool, err = New(config())
+	suite.NoError(err)
 
 	// Create wallet
 	suite.WalletName = "testwallet"
 	walletReq := client.CreateWalletAsync(suite.WalletName)
 	client.Send()
 	_, err = walletReq.Receive()
-	assert.NoError(suite.T(), err)
+	suite.NoError(err)
 
 	// Get new address
 	addressReq := client.GetNewAddressAsync(suite.WalletName)
 	client.Send()
 	suite.Address, err = addressReq.Receive()
-	assert.NoError(suite.T(), err)
+	suite.NoError(err)
 
 	// Generate blocks
 	var nBlocks int64 = 20
 	generateReq := client.GenerateToAddressAsync(nBlocks, suite.Address, nil)
 	client.Send()
 	hashes, err := generateReq.Receive()
-	assert.NoError(suite.T(), err)
-	assert.EqualValues(suite.T(), nBlocks, len(hashes))
+	suite.NoError(err)
+	suite.EqualValues(nBlocks, len(hashes))
 	suite.BlockCount = nBlocks
 
 	// Set block hashes
 	genBlockHashReq := client.GetBlockHashAsync(0)
 	client.Send()
 	genBlockHash, err := genBlockHashReq.Receive()
-	assert.NoError(suite.T(), err)
+	suite.NoError(err)
 	suite.BlockHashes = append([]*chainhash.Hash{genBlockHash}, hashes...)
 }
 
@@ -78,8 +79,8 @@ func (suite *RPCClientTestSuite) TestSanityBlockCount() {
 	blockCountReq := client.GetBlockCountAsync()
 	client.Send()
 	blockCount, err := blockCountReq.Receive()
-	assert.NoError(suite.T(), err)
-	assert.EqualValues(suite.T(), suite.BlockCount, blockCount)
+	suite.NoError(err)
+	suite.EqualValues(suite.BlockCount, blockCount)
 }
 
 type RangeArgs struct {
@@ -183,13 +184,13 @@ func (suite *RPCClientTestSuite) TestGetHashesByRange() {
 	tests := GetHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			hashes, err := suite.Client.GetBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
+			hashes, err := suite.Pool.GetBlockHashesByRange(tt.args.minBlockNumber, tt.args.maxBlockNumber)
 			if tt.wantErr {
-				assert.Error(suite.T(), err)
+				suite.Error(err)
 				return
 			}
-			assert.NoError(suite.T(), err)
-			assert.ElementsMatch(suite.T(), tt.want, hashes)
+			suite.NoError(err)
+			suite.ElementsMatch(tt.want, hashes)
 		})
 	}
 }
@@ -198,20 +199,20 @@ func (suite *RPCClientTestSuite) TestGetBlockHeaders() {
 	tests := GetBlockHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			blockHeaders, err := suite.Client.GetBlockHeaders(tt.args)
+			blockHeaders, err := suite.Pool.GetBlockHeaders(tt.args)
 			if tt.wantErr {
-				assert.Error(suite.T(), err)
+				suite.Error(err)
 				return
 			}
-			assert.NoError(suite.T(), err)
+			suite.NoError(err)
 
 			blockHeaderHashes := make([]*chainhash.Hash, len(blockHeaders))
 			for i, block := range blockHeaders {
 				hash, err := chainhash.NewHashFromStr(block.Hash())
-				assert.NoError(suite.T(), err)
+				suite.NoError(err)
 				blockHeaderHashes[i] = hash
 			}
-			assert.ElementsMatch(suite.T(), tt.want, blockHeaderHashes)
+			suite.ElementsMatch(tt.want, blockHeaderHashes)
 		})
 	}
 }
@@ -220,21 +221,57 @@ func (suite *RPCClientTestSuite) TestGetBlocks() {
 	tests := GetBlockHashTestTable(suite)
 	for _, tt := range tests {
 		suite.Run(tt.name, func() {
-			blocks, err := suite.Client.GetBlocks(tt.args)
+			blocks, err := suite.Pool.GetBlocks(tt.args)
 			if tt.wantErr {
-				assert.Error(suite.T(), err)
+				suite.Error(err)
 				return
 			}
-			assert.NoError(suite.T(), err)
+			suite.NoError(err)
 
 			blockHashes := make([]*chainhash.Hash, len(blocks))
 			for i, block := range blocks {
 				hash, err := chainhash.NewHashFromStr(block.Hash())
-				assert.NoError(suite.T(), err)
+				suite.NoError(err)
 				blockHashes[i] = hash
 			}
-			assert.ElementsMatch(suite.T(), tt.want, blockHashes)
+			suite.ElementsMatch(tt.want, blockHashes)
 		})
+	}
+}
+
+func (suite *RPCClientTestSuite) TestPipeline() {
+	hashesCh := make(chan []*chainhash.Hash, 1)
+	blocksCh := make(chan *types.Block, 1)
+	go func() {
+		defer close(hashesCh)
+		for i := 0; i < int(suite.BlockCount)-1; i += 2 {
+			hashes, err := suite.Pool.GetBlockHashesByRange(int64(i), int64(i+1))
+			if err != nil {
+				suite.T().Error(err)
+				return
+			}
+			hashesCh <- hashes
+		}
+	}()
+	go func() {
+		defer close(blocksCh)
+		for hashes := range hashesCh {
+			blocks, err := suite.Pool.GetBlocks(hashes)
+			if err != nil {
+				suite.T().Error(err)
+				return
+			}
+			for _, block := range blocks {
+				blocksCh <- block
+			}
+		}
+	}()
+	curBlock := int64(0)
+	for block := range blocksCh {
+		suite.T().Logf("received block: %d", block.Height())
+		suite.Equal(curBlock, block.Height())
+		suite.Equal(suite.BlockHashes[curBlock].String(), block.Hash())
+		curBlock++
 	}
 }
 
@@ -253,26 +290,25 @@ func min(a, b int) int {
 }
 
 func BenchmarkRPCClientGetBlocks(b *testing.B) {
-	client, err := GetTestRPCClient()
+	client, err := rpcclient.New(config(), nil)
 	if err != nil {
 		b.Fatal(err)
 	}
+	pool, err := New(config())
+	if err != nil {
+		b.Fatal(err)
+	}
+
 	walletName := "testwallet"
-	walletReq := client.CreateWalletAsync(walletName)
-	client.Send()
-	walletReq.Receive()
+	client.CreateWallet(walletName)
 	// if _, err = walletReq.Receive(); err != nil {
 	// 	b.Fatal(err)
 	// }
-	addressReq := client.GetNewAddressAsync(walletName)
-	client.Send()
-	address, err := addressReq.Receive()
+	address, err := client.GetNewAddress(walletName)
 	if err != nil {
 		b.Fatal(err)
 	}
-	generateReq := client.GenerateToAddressAsync(10_000, address, nil)
-	client.Send()
-	hashes, err := generateReq.Receive()
+	hashes, err := client.GenerateToAddress(10_000, address, nil)
 	if err != nil {
 		b.Fatal(err)
 	}
@@ -284,7 +320,7 @@ func BenchmarkRPCClientGetBlocks(b *testing.B) {
 			}
 			b.Run(fmt.Sprintf("total=%d,batch=%d", total, batch), func(b *testing.B) {
 				for i := 0; i < b.N; i += batch {
-					if _, err := client.GetBlocks(hashes[i:min(i+batch, b.N)]); err != nil {
+					if _, err := pool.GetBlocks(hashes[i:min(i+batch, b.N)]); err != nil {
 						b.Fatal(err)
 					}
 				}
