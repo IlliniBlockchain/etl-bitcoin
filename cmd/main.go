@@ -17,11 +17,11 @@ func main() {
 		Pass:         "test",
 		HTTPPostMode: true, // Bitcoin core only supports HTTP POST mode
 		DisableTLS:   true, // Bitcoin core does not provide TLS by default
-	}, nil)
+	})
 	if err != nil {
 		log.Fatal(err)
 	}
-	defer client.Shutdown()
+	defer client.Close()
 
 	db, err := neo4j_csv.NewDatabase(context.Background(), map[string]interface{}{"dataDir": "./data"})
 	if err != nil {

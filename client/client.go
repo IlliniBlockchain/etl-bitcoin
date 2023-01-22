@@ -14,4 +14,6 @@ type Client interface {
 	GetBlockHeaders(hashes []*chainhash.Hash) ([]*types.BlockHeader, error)
 	// GetBlocksByRange returns blocks with transactions from the server given a list/range of block hashes.
 	GetBlocks(hashes []*chainhash.Hash) ([]*types.Block, error)
+	// Close closes the connection to the server.
+	Close() error
 }
