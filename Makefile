@@ -15,6 +15,7 @@ docker.start.bitcoin-core: ## Start bitcoin-core docker container
 		-p 18444:18444 \
 		ruimarinho/bitcoin-core \
 		-printtoconsole \
+		-debug=rpc \
 		-regtest=1 \
 		-rpcallowip=172.17.0.0/16 \
 		-rpcbind=0.0.0.0 \
