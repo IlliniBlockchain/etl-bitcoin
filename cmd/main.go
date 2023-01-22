@@ -29,7 +29,7 @@ func main() {
 	}
 	defer db.Close()
 
-	loaderManager, err := loader.NewLoaderManager(context.Background(), client, db, nil)
+	loaderManager, err := loader.NewLoaderManager(context.Background(), client)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -48,7 +48,11 @@ func main() {
 	min := int64(0)
 	max := int64(300_000)
 	for min < max {
-		stat, err := loaderManager.SendInput(loader.BlockRange{Start: min, End: min + inc})
+		dbTx, err := db.NewDBTx()
+		if err != nil {
+			log.Fatal(err)
+		}
+		stat, err := loaderManager.SendInput(loader.BlockRange{Start: min, End: min + inc - 1}, dbTx)
 		if err != nil {
 			log.Fatal(err)
 		}
