@@ -1,6 +1,7 @@
 package rpcclient
 
 import (
+	"fmt"
 	"math/rand"
 	"testing"
 	"time"
@@ -143,7 +144,6 @@ type BlockHashTest struct {
 }
 
 func GetBlockHashTestTable(suite *RPCClientTestSuite) []BlockHashTest {
-
 	rand.Seed(time.Now().UnixNano())
 	invalidHashBytes := make([]byte, 32)
 	rand.Read(invalidHashBytes)
@@ -243,4 +243,52 @@ func TestRPCClientTestSuite(t *testing.T) {
 		t.Skip("skipping RPCClientTestSuite in short mode.")
 	}
 	suite.Run(t, new(RPCClientTestSuite))
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
+
+func BenchmarkRPCClientGetBlocks(b *testing.B) {
+	client, err := GetTestRPCClient()
+	if err != nil {
+		b.Fatal(err)
+	}
+	walletName := "testwallet"
+	walletReq := client.CreateWalletAsync(walletName)
+	client.Send()
+	walletReq.Receive()
+	// if _, err = walletReq.Receive(); err != nil {
+	// 	b.Fatal(err)
+	// }
+	addressReq := client.GetNewAddressAsync(walletName)
+	client.Send()
+	address, err := addressReq.Receive()
+	if err != nil {
+		b.Fatal(err)
+	}
+	generateReq := client.GenerateToAddressAsync(10_000, address, nil)
+	client.Send()
+	hashes, err := generateReq.Receive()
+	if err != nil {
+		b.Fatal(err)
+	}
+	b.ResetTimer()
+	for _, total := range []int{1, 10, 100, 1_000, 10_000} {
+		for _, batch := range []int{1, 10, 100, 1_000, 10_000} {
+			if batch > total {
+				continue
+			}
+			b.Run(fmt.Sprintf("total=%d,batch=%d", total, batch), func(b *testing.B) {
+				for i := 0; i < b.N; i += batch {
+					if _, err := client.GetBlocks(hashes[i:min(i+batch, b.N)]); err != nil {
+						b.Fatal(err)
+					}
+				}
+			})
+		}
+	}
 }

@@ -40,6 +40,9 @@ test.integration: test.integration.rpcclient ## Run integration tests
 test.integration.rpcclient: docker.start.bitcoin-core ## Run rpcclient integration tests
 	@go test -run RPCClient ${PKG_LIST}; make docker.stop > /dev/null
 
+benchmark.integration.rpcclient: docker.start.bitcoin-core ## Run rpcclient integration benchmarks
+	@go test -run XXX -bench RPCClient ${PKG_LIST}; make docker.stop > /dev/null
+
 race: dep ## Run data race detector
 	@go test -race -short ${PKG_LIST}
 
